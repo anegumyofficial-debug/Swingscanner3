@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CSS CUSTOM (Untuk Meniru Estetika) ---
+# --- CSS CUSTOM (Versi Perbaikan) ---
 st.markdown("""
     <style>
     .main {
@@ -23,8 +23,7 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     </style>
-    """, unsafe_allow_ some_html=True)
-
+    """, unsafe_allow_html=True)
 # --- SIDEBAR / NAVIGASI ---
 with st.sidebar:
     st.title("🦠 Infeksius Actio")
