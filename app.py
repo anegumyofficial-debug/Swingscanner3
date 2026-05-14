@@ -17,8 +17,14 @@
 
     <!--
     Following a mix of:
-    - https://medium.com/swlh/are-you-using-svg-favicons-yet-a-guide-for-modern-browsers-836a6aace3df
-    - https://css-tricks.com/svg-favicons-and-all-the-fun-things-we-can-do-with-them/
+    @st.cache_data(ttl=3600) # 
+def load_data(tickers):
+    # Download massal lebih aman dari blokir IP 
+    return yf.download(tickers, period="1y", interval="1d", group_by='ticker')
+
+# Cara mengambil nilai indikator yang benar (Menghindari TypeError) 
+l_band = float(latest_bb.iloc) # Mengambil nilai pertama, bukan objek indexer
+u_band = float(latest_bb.iloc[2])    - https://css-tricks.com/svg-favicons-and-all-the-fun-things-we-can-do-with-them/
     -->
     <link id="favicon" rel="icon" href="/-/build/favicon.svg" />
     <!--
