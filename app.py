@@ -1,82 +1,104 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-import datetime
-import plotly.graph_objects as go
+import pandas_ta as ta
+from datetime import datetime, timedelta
+import concurrent.futures
 
 # --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Swing Trading Scanner", layout="wide")
+st.set_page_config(page_title="Infectious Actio Clone", layout="wide")
 
-# --- CSS CUSTOM UNTUK TAMPILAN ---
+# --- CUSTOM CSS (Agar Mirip Target) ---
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+    .stMetric { background-color: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0; }
+    .buy-signal { color: green; font-weight: bold; }
+    .sell-signal { color: red; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER & SIDEBAR ---
-st.title("📈 Swing Trading Scanner V.2")
-st.caption("Realtime Daily Market Screening • Indonesia Stock Exchange")
+# --- DAFTAR SAHAM (DATABASE) ---
+# Di website target, mereka melakukan scan ke hampir seluruh saham aktif (200-400 saham).
+TICKERS = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "AMRT.JK", "BBNI.JK"] 
 
-with st.sidebar:
-    st.header("📊 • INFECTIOUS ACTIO")
-    st.subheader("🧩 Panel Kontrol Utama")
-    tp_input = st.number_input("Take Profit (%)", value=5)
-    sl_input = st.number_input("Stop Loss (%)", value=3)
-    filter_fake = st.checkbox("Filter Fake Rebound")
-    
-    st.subheader("📋 Pilih Menu")
-    menu = st.selectbox("Menu", ["Screener Saham", "Harga Wajar", "Average Down"])
-    
-    search_code = st.text_input("🔍 Cari Kode Saham (Contoh: BBCA.JK)")
-
-# --- RINGKASAN PASAR (IHSG) ---
-st.subheader("📈 IHSG Daily (TradingView Style)")
-col1, col2, col3, col4 = st.columns(4)
-
-# Simulasi data IHSG (Ganti dengan API Saham jika ada)
-ihsg_val = 7585.69
-ihsg_change = -1.62
-
-col1.metric("IHSG", f"{ihsg_val}", f"{ihsg_change}%", delta_color="inverse")
-col2.write(f"**📅 Harga Hari Ini:** {datetime.date.today()}")
-
-# --- TABEL SIGNAL (FILTER STRATEGI) ---
-st.subheader("🎯 FILTER STRATEGI")
-
-# Contoh Data Frame untuk Tabel
-data = {
-    "Kode": ["BJTM", "BMHS", "MTWI", "JGLE", "BNGA"],
-    "Harga": [575.0, 193.0, 358.0, 55.0, 1770.0],
-    "Signal": ["HOLD", "HOLD", "HOLD", "HOLD", "BUY"],
-    "Trend": ["🟢 Bullish", "🟢 Bullish", "🔴 Bearish", "🟢 Bullish", "🟢 Bullish"],
-    "Zone": ["SELL", "MID", "MID", "MID", "BUY"],
-    "MA": ["MA5, MA50", "MA10, MA100", "MA20", "MA50", "None"],
-    "RSI": [50.2, 51.4, 51.8, 53.0, 32.5]
-}
-
-df = pd.DataFrame(data)
-
-# Tampilkan Tabel
-st.dataframe(df, use_container_width=True)
-
-# --- FUNGSI ANALISIS SEDERHANA ---
-if search_code:
-    st.write(f"### Analisis Untuk {search_code}")
+# --- LOGIKA ANALISIS (BACKEND) ---
+def analyze_stock(ticker):
     try:
-        # Mengambil data saham dari Yahoo Finance
-        ticker = yf.Ticker(search_code)
-        hist = ticker.history(period="1mo")
+        # Ambil data lebih banyak (6 bulan) untuk akurasi MA & RSI
+        df = yf.download(ticker, period="6mo", interval="1d", progress=False)
+        if df.empty or len(df) < 50: return None
         
-        # Membuat Grafik Candlestick
-        fig = go.Figure(data=[go.Candlestick(x=hist.index,
-                        open=hist['Open'], high=hist['High'],
-                        low=hist['Low'], close=hist['Close'])])
-        fig.update_layout(title=f"Chart {search_code}", xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
+        # Kalkulasi Indikator
+        df['RSI'] = ta.rsi(df['Close'], length=14)
+        bbands = ta.bbands(df['Close'], length=20, std=2)
+        df = pd.concat([df, bbands], axis=1)
+        df['MA20'] = ta.sma(df['Close'], length=20)
         
-    except Exception as e:
-        st.error(f"Gagal mengambil data untuk {search_code}. Pastikan format benar (contoh: ASII.JK)")
+        # Ambil baris terakhir dengan cara yang aman (Fixing your previous error)
+        latest = df.iloc[-1]
+        price = float(latest['Close'])
+        rsi_val = float(latest['RSI'])
+        bbl = float(latest.iloc[:, 7]) # Kolom Lower Band
+        bbu = float(latest.iloc[:, 9]) # Kolom Upper Band
+        
+        # --- LOGIKA SIGNAL ---
+        signal = "HOLD"
+        zone = "NEUTRAL"
+        
+        if price <= bbl or rsi_val < 35:
+            signal = "BUY"
+            zone = "OVERSOLD"
+        elif price >= bbu or rsi_val > 70:
+            signal = "SELL"
+            zone = "OVERBOUGHT"
+            
+        return {
+            "Ticker": ticker.replace(".JK", ""),
+            "Price": f"{price:,.0f}",
+            "Signal": signal,
+            "Zone": zone,
+            "RSI": f"{rsi_val:.2f}",
+            "MA20": f"{latest['MA20']:,.0f}"
+        }
+    except:
+        return None
 
-st.info("Update otomatis harian • Last update: " + datetime.datetime.now().strftime("%d %b %Y %H:%M"))
+# --- UI HEADER ---
+st.title("📈 Infectious Actio - Swing Scanner V3")
+st.info("Penyaring Saham Real-time Berdasarkan Teknikal Indikator (BB, RSI, SMA)")
+
+# --- SIDEBAR CONTROL ---
+with st.sidebar:
+    st.header("⚙️ Filter Panel")
+    min_rsi = st.slider("Min RSI", 0, 100, 30)
+    max_rsi = st.slider("Max RSI", 0, 100, 70)
+    start_scan = st.button("🚀 Mulai Pemindaian Database")
+
+# --- PROSES SCANNING (MULTITHREADING) ---
+if start_scan:
+    st.subheader("🔍 Hasil Pemindaian")
+    progress_bar = st.progress(0)
+    
+    results = []
+    # Menggunakan ThreadPoolExecutor agar scan cepat (tidak satu-satu)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_ticker = {executor.submit(analyze_stock, t): t for t in TICKERS}
+        for i, future in enumerate(concurrent.futures.as_completed(future_to_ticker)):
+            res = future.result()
+            if res: results.append(res)
+            progress_bar.progress((i + 1) / len(TICKERS))
+
+    if results:
+        final_df = pd.DataFrame(results)
+        
+        # Tampilkan Tabel dengan Style
+        def color_signal(val):
+            color = 'green' if val == 'BUY' else 'red' if val == 'SELL' else 'black'
+            return f'color: {color}; font-weight: bold'
+
+        st.dataframe(final_df.style.applymap(color_signal, subset=['Signal']), width='stretch')
+    else:
+        st.warning("Tidak ada data yang ditemukan. Coba lagi nanti.")
+
+else:
+    st.write("Silakan klik tombol di sidebar untuk mulai memindai database saham.")
