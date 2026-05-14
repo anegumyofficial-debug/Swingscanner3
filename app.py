@@ -1,80 +1,107 @@
 import streamlit as st
-import yfinance as yf
-import pandas_ta as ta
 import pandas as pd
-from datetime import datetime
+import plotly.express as px
+import leafmap.foliumap as leafmap
 
-# 1. KONFIGURASI LAYOUT
-st.set_page_config(layout="wide", page_title="Master Stock Scanner Pro")
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(
+    page_title="Infeksius Actio Dashboard",
+    page_icon="🦠",
+    layout="wide"
+)
 
-# 2. CSS CUSTOM (IDENTIK DENGAN REFERENSI)
+# --- CSS CUSTOM (Untuk Meniru Estetika) ---
 st.markdown("""
     <style>
-    [data-testid="stMetric"] {
+    .main {
+        background-color: #f5f7f9;
+    }
+    .stMetric {
         background-color: #ffffff;
-        border: 1px solid #e0e0e0;
-        padding: 15px 20px !important;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    .stDataFrame { border: 1px solid #e0e0e0; border-radius: 12px; }
     </style>
-    """, unsafe_allow_html=True)
+    """, unsafe_allow_ some_html=True)
 
-st.title("📊 Master Stock Scanner - Pro Dashboard")
-st.write(f"Update: {datetime.now().strftime('%d %B %Y | %H:%M')} WIB")
-st.markdown("---")
+# --- SIDEBAR / NAVIGASI ---
+with st.sidebar:
+    st.title("🦠 Infeksius Actio")
+    st.image("https://via.placeholder.com/150", caption="Logo Program") # Ganti dengan URL logo asli
+    menu = st.radio(
+        "Navigasi Utama",
+        ["Dashboard Ringkasan", "Peta Sebaran", "Analisis Tren", "Informasi Penyakit"]
+    )
+    st.divider()
+    st.info("Aplikasi ini digunakan untuk pemantauan data penyakit infeksius secara real-time.")
 
-# 3. LOGIKA ANALISIS (Selalu ambil nilai terupdate)
-def fetch_data(ticker, label):
-    config = {
-        "Day (Scalping)": {"p": "1mo", "i": "1h", "rsi_l": 30},
-        "Weekly (Swing)": {"p": "6mo", "i": "1d", "rsi_l": 40},
-        "Monthly (Invest)": {"p": "2y", "i": "1wk", "rsi_l": 45}
-    }
-    c = config[label]
-    df = yf.download(ticker, period=c['p'], interval=c['i'], progress=False, auto_adjust=True)
+# --- MOCK DATA (Ganti dengan dataset asli Anda) ---
+data = pd.DataFrame({
+    'Wilayah': ['Jakarta', 'Bandung', 'Surabaya', 'Medan', 'Makassar'],
+    'Kasus': [120, 85, 95, 60, 45],
+    'Sembuh': [100, 70, 80, 50, 40],
+    'lat': [-6.2088, -6.9175, -7.2575, 3.5952, -5.1476],
+    'lon': [106.8456, 107.6191, 112.7521, 98.6722, 119.4327]
+})
+
+# --- LOGIKA HALAMAN ---
+
+if menu == "Dashboard Ringkasan":
+    st.header("📊 Ringkasan Data Infeksius")
     
-    if df is None or df.empty: return None
-    if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+    # Row 1: Metrik Utama
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Kasus", data['Kasus'].sum(), "+5% dari bulan lalu")
+    col2.metric("Total Sembuh", data['Sembuh'].sum(), "82% Rate")
+    col3.metric("Wilayah Terdampak", len(data), "Provinsi")
 
-    df['RSI'] = ta.rsi(df['Close'], length=14)
-    bb = ta.bbands(df['Close'], length=20, std=2)
-    df = pd.concat([df, bb], axis=1).dropna(subset=['Close', 'RSI'])
+    st.divider()
+
+    # Row 2: Visualisasi
+    c1, c2 = st.columns([6, 4])
+    with c1:
+        st.subheader("Perbandingan Kasus per Wilayah")
+        fig = px.bar(data, x='Wilayah', y='Kasus', color='Wilayah', template="plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
     
-    # Ambil baris terakhir yang valid
-    latest = df.iloc[-1]
-    price = round(float(latest['Close']), 0)
-    rsi_v = round(float(latest['RSI']), 2)
-    l_band = round(float(latest.filter(like='BBL').iloc), 0)
+    with c2:
+        st.subheader("Proporsi Sembuh")
+        fig_pie = px.pie(data, values='Sembuh', names='Wilayah', hole=0.4)
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+elif menu == "Peta Sebaran":
+    st.header("🗺️ Peta Distribusi Geografis")
     
-    if rsi_v <= c['rsi_l'] or price <= l_band:
-        status, sig = "🟢 SIAP SEROK", "buy"
-    else:
-        status, sig = "⚪ WAIT / NEUTRAL", "neutral"
+    # Integrasi Peta Menggunakan Leafmap
+    m = leafmap.Map(center=[-2.5, 118], zoom=5)
+    m.add_points_from_xy(
+        data, 
+        x="lon", 
+        y="lat", 
+        popups=["Wilayah", "Kasus"],
+        layer_name="Titik Kasus"
+    )
+    m.to_streamlit(height=600)
 
-    return {"Saham": ticker.replace(".JK", ""), "Harga": price, "Status": status, "RSI": rsi_v, "sig": sig}
+elif menu == "Analisis Tren":
+    st.header("📈 Analisis Tren Waktu")
+    st.write("Fitur ini menampilkan perkembangan data dari waktu ke waktu.")
+    # Contoh chart garis sederhana
+    trend_data = pd.DataFrame({
+        'Bulan': ['Jan', 'Feb', 'Mar', 'Apr'],
+        'Kasus': [20, 45, 30, 65]
+    })
+    fig_line = px.line(trend_data, x='Bulan', y='Kasus', markers=True)
+    st.plotly_chart(fig_line, use_container_width=True)
 
-# 4. IMPLEMENTASI BAR METRIC & TABEL
-tickers = ["BBRI.JK", "BBCA.JK", "BBNI.JK", "ASII.JK", "TLKM.JK", "BMRI.JK"]
-tabs = st.tabs(["🕒 Day Scalping", "📅 Weekly Swing", "🏛️ Monthly Invest"])
-
-for tab, label in zip(tabs, ["Day (Scalping)", "Weekly (Swing)", "Monthly (Invest)"]):
-    with tab:
-        results = []
-        for t in tickers:
-            try:
-                res = fetch_data(t, label)
-                if res: results.append(res)
-            except: continue
-        
-        if results:
-            df_res = pd.DataFrame(results)
-            # --- BAR METRIC (SUMMARY) ---
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Total Pantauan", len(tickers))
-            m2.metric("🟢 Siap Serok", len(df_res[df_res['sig'] == 'buy']))
-            m3.metric("⚪ Neutral", len(df_res[df_res['sig'] == 'neutral']))
-            
-            st.markdown("### Detail Analisis Terupdate")
-            st.dataframe(df_res.drop(columns=['sig']), use_container_width=True)
+else:
+    st.header("ℹ️ Informasi & Edukasi")
+    st.markdown("""
+    ### Tentang Penyakit Infeksius
+    Penyakit infeksius disebabkan oleh organisme seperti bakteri, virus, jamur, atau parasit. 
+    Aplikasi ini bertujuan untuk:
+    1. Memberikan transparansi data.
+    2. Membantu pengambilan keputusan medis.
+    3. Edukasi masyarakat luas.
+    """)
