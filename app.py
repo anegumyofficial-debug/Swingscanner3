@@ -7,35 +7,35 @@ from datetime import datetime
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(layout="wide", page_title="Master Stock Scanner Pro")
 
-# 2. CSS UNTUK TAMPILAN IDENTIK (Metric Bar & Tabel)
+# 2. CSS CUSTOM UNTUK TAMPILAN IDENTIK
 st.markdown("""
     <style>
-    /* Mengatur gaya kotak Metric agar sama persis dengan referensi */
+    /* Mengatur kotak Metric agar berbayang dan melengkung rapi */
     [data-testid="stMetric"] {
         background-color: #ffffff;
-        border: 1px solid #dee2e6;
+        border: 1px solid #e9ecef;
         padding: 20px !important;
         border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
     }
-    /* Mengatur font agar lebih modern */
-    [data-testid="stMetricLabel"] { font-size: 16px !important; font-weight: 600 !important; color: #6c757d !important; }
-    [data-testid="stMetricValue"] { font-size: 28px !important; font-weight: 700 !important; }
+    /* Mempercantik font pada Metric */
+    [data-testid="stMetricLabel"] { font-size: 15px !important; font-weight: 600 !important; color: #495057 !important; }
+    [data-testid="stMetricValue"] { font-size: 26px !important; font-weight: 700 !important; color: #212529 !important; }
     
-    /* Memperluas area tabel agar memenuhi layar */
-    .stDataFrame { border: 1px solid #dee2e6; border-radius: 12px; }
+    /* Tabel agar lebih luas dan rapi */
+    .stDataFrame { border-radius: 12px; overflow: hidden; border: 1px solid #e9ecef; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🚀 Master Stock Scanner - Pro Dashboard")
-st.write(f"Kondisi Pasar: {datetime.now().strftime('%A, %d %B %Y | %H:%M')} WIB")
+st.write(f"Update: {datetime.now().strftime('%A, %d %B %Y | %H:%M')} WIB")
 st.markdown("---")
 
 # 3. DAFTAR SAHAM
 tickers = ["BBRI.JK", "BBCA.JK", "BBNI.JK", "ASII.JK", "TLKM.JK", "BMRI.JK"]
 
-# 4. LOGIKA ANALISIS (Selalu ambil data valid terakhir)
-def analyze_stock(ticker, timeframe):
+# 4. LOGIKA ANALISIS (Selalu ambil data terakhir yang valid)
+def fetch_stock_data(ticker, timeframe):
     config = {
         "Day (Scalping)": {"p": "1mo", "i": "1h", "rsi_l": 30},
         "Weekly (Swing)": {"p": "6mo", "i": "1d", "rsi_l": 40},
@@ -52,7 +52,7 @@ def analyze_stock(ticker, timeframe):
     bb = ta.bbands(df['Close'], length=20, std=2)
     df = pd.concat([df, bb], axis=1).dropna(subset=['Close', 'RSI'])
     
-    # Ambil baris terakhir yang memiliki data (Anti-IHSG Tutup)
+    # Ambil baris terakhir yang ada datanya
     last = df.iloc[-1]
     price = round(float(last['Close']), 0)
     rsi_v = round(float(last['RSI']), 2)
@@ -61,47 +61,47 @@ def analyze_stock(ticker, timeframe):
 
     # Logika Status
     if rsi_v <= c['rsi_l'] or price <= l_band:
-        status, sig = "🟢 SIAP SEROK", "buy"
+        status, signal = "🟢 SIAP SEROK", "buy"
     elif rsi_v >= (100 - c['rsi_l']) or price >= u_band:
-        status, sig = "🔴 JUAL / PROFIT", "sell"
+        status, signal = "🔴 JUAL / PROFIT", "sell"
     else:
-        status, sig = "⚪ WAIT / NEUTRAL", "neutral"
+        status, signal = "⚪ WAIT / NEUTRAL", "neutral"
 
-    return {"Saham": ticker.replace(".JK", ""), "Harga": price, "Status": status, "RSI": rsi_v, "sig": sig}
+    return {"Saham": ticker.replace(".JK", ""), "Harga": price, "Status": status, "RSI": rsi_v, "sig": signal}
 
-# 5. RENDER DASHBOARD (Metric Bar Baru & Tabel)
+# 5. RENDER DASHBOARD (BAR METRIC & TABEL)
 tab1, tab2, tab3 = st.tabs(["🕒 Day Scalping", "📅 Weekly Swing", "🏛️ Monthly Invest"])
 
-def render_content(tab, label):
+def render_view(tab, label):
     with tab:
-        results = []
+        data_rows = []
         for t in tickers:
-            data = analyze_stock(t, label)
-            if data: results.append(data)
+            res = fetch_stock_data(t, label)
+            if res: data_rows.append(res)
         
-        if results:
-            df_final = pd.DataFrame(results)
+        if data_rows:
+            df_final = pd.DataFrame(data_rows)
             
-            # --- BAR BARU (SUMMARY METRICS) ---
+            # --- BAR METRIC (IDENTIK REFERENSI) ---
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Total Pantauan", f"{len(tickers)}")
+            m1.metric("Total Pantauan", len(tickers))
             m2.metric("Siap Serok", len(df_final[df_final['sig'] == 'buy']))
             m3.metric("Waktunya Jual", len(df_final[df_final['sig'] == 'sell']))
             m4.metric("Posisi Wait", len(df_final[df_final['sig'] == 'neutral']))
             
-            st.markdown("### 📋 Detail Rekomendasi Terupdate")
+            st.markdown("### 📊 Detail Analisis Terupdate")
             
-            # Pewarnaan Baris
-            def color_row(v):
+            # Styling Warna Status
+            def color_status(v):
                 if "SEROK" in str(v): return 'background-color: #d4edda; color: #155724; font-weight: bold'
                 if "JUAL" in str(v): return 'background-color: #f8d7da; color: #721c24; font-weight: bold'
                 return ''
 
             st.dataframe(
-                df_final.drop(columns=['sig']).style.applymap(color_row, subset=['Status']),
+                df_final.drop(columns=['sig']).style.applymap(color_status, subset=['Status']),
                 use_container_width=True
             )
 
-render_content(tab1, "Day (Scalping)")
-render_content(tab2, "Weekly (Swing)")
-render_content(tab3, "Monthly (Invest)")
+render_view(tab1, "Day (Scalping)")
+render_view(tab2, "Weekly (Swing)")
+render_view(tab3, "Monthly (Invest)")
