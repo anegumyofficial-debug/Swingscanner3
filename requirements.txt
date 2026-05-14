@@ -1,5 +1,1 @@
-streamlit
-pandas
-plotly
-leafmap
-folium
+pip install streamlit pandas yfinance plotly ta-lib
