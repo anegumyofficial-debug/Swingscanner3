@@ -2,108 +2,116 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import pandas_ta as ta
-import plotly.express as px
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Swing Trading Scanner", layout="wide")
 
-# --- STYLE CSS AGAR MIRIP ---
+# --- CUSTOM CSS (Agar tampilan bersih & profesional) ---
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .stApp { background-color: #FFFFFF; }
+    div[data-testid="stMetricValue"] { font-size: 24px; }
+    .status-up { color: green; font-weight: bold; }
+    .status-down { color: red; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR (FILTER STRATEGI) ---
-with st.sidebar:
-    st.title("🎯 Infeksius Actio")
-    st.subheader("Filter Strategi")
-    selected_strategy = st.multiselect(
-        "Pilih Indikator:",
-        ["MA 20 Cross", "MA 50 Cross", "RSI Oversold", "RSI Overbought", "MACD Golden Cross"],
-        default=["MA 20 Cross", "RSI Oversold"]
-    )
-    min_volume = st.number_input("Min Volume (Juta)", value=1, help="Filter likuiditas saham")
-    st.info("Scanner ini memantau saham IHSG secara real-time.")
-
-# --- HEADER ---
-st.title("📈 Swing Trading Scanner")
-tab1, tab2, tab3 = st.tabs(["🔍 Scanner", "🔥 Market Heatmap", "📊 Stock Analysis"])
-
-# --- DATA DUMMY / LIST SAHAM ---
-# Di aplikasi asli, mereka menggunakan daftar saham IHSG (JK)
-tickers = ["BBCA.JK", "BBRI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "ADRO.JK", "UNTR.JK"]
-
-@st.cache_data
-def get_stock_data(symbols):
+# --- FUNGSI SCANNER ---
+@st.cache_data(ttl=3600)
+def scan_saham(ticker_list):
     results = []
-    for s in symbols:
+    for ticker in ticker_list:
         try:
-            df = yf.download(s, period="3mo", interval="1d", progress=False)
-            if df.empty: continue
+            # Ambil data historis
+            df = yf.download(ticker, period="6mo", interval="1d", progress=False)
+            if len(df) < 50: continue
             
-            # Hitung Indikator
-            df['RSI'] = ta.rsi(df['Close'], length=14)
+            # Hitung Indikator (MA & RSI seperti di screenshot)
             df['MA20'] = ta.sma(df['Close'], length=20)
+            df['MA50'] = ta.sma(df['Close'], length=50)
+            df['RSI'] = ta.rsi(df['Close'], length=14)
             
-            last_price = df['Close'].iloc[-1]
-            prev_price = df['Close'].iloc[-2]
-            change = ((last_price - prev_price) / prev_price) * 100
+            last_price = float(df['Close'].iloc[-1])
+            prev_price = float(df['Close'].iloc[-2])
+            change_pct = ((last_price - prev_price) / prev_price) * 100
+            last_rsi = df['RSI'].iloc[-1]
+            last_ma20 = df['MA20'].iloc[-1]
+            last_ma50 = df['MA50'].iloc[-1]
             
-            # Logika Sinyal Sederhana
-            signal = "Neutral"
-            if last_price > df['MA20'].iloc[-1] and df['RSI'].iloc[-1] < 40:
-                signal = "STRONG BUY"
-            elif df['RSI'].iloc[-1] < 30:
-                signal = "BUY (Oversold)"
+            # Logika Trend
+            trend = "Up-Trend" if last_price > last_ma50 else "Down-Trend"
+            
+            # Logika Sinyal (Actionable)
+            if last_rsi < 35:
+                action = "BUY (Oversold)"
+            elif last_price > last_ma20 and prev_price <= df['MA20'].iloc[-2]:
+                action = "BUY (MA Cross)"
+            elif last_rsi > 70:
+                action = "SELL (Overbought)"
+            else:
+                action = "Wait/Neutral"
             
             results.append({
-                "Ticker": s,
-                "Price": round(last_price, 2),
-                "Change %": round(change, 2),
-                "RSI": round(df['RSI'].iloc[-1], 2),
-                "Signal": signal
+                "Ticker": ticker.replace(".JK", ""),
+                "Price": f"{last_price:,.0f}",
+                "Change %": round(change_pct, 2),
+                "RSI": round(last_rsi, 2),
+                "Trend": trend,
+                "Actionable": action
             })
         except:
             continue
     return pd.DataFrame(results)
 
-# --- ISI TAB 1: SCANNER ---
+# --- TAMPILAN UTAMA ---
+st.title("📈 Swing Trading Scanner")
+
+# Sidebar untuk filter seperti di screenshot
+with st.sidebar:
+    st.header("Filter Strategi")
+    strategi = st.multiselect("Pilih Strategi:", 
+                             ["MA 20 Cross", "MA 50 Cross", "RSI Oversold", "Price Action"],
+                             default=["MA 20 Cross", "RSI Oversold"])
+    min_rsi = st.slider("Min RSI", 0, 100, 30)
+    
+# Layout Tab (Scanner, Market Heatmap, Stock Analysis)
+tab1, tab2, tab3 = st.tabs(["🔍 Scanner", "🔥 Market Heatmap", "📊 Stock Analysis"])
+
 with tab1:
-    st.subheader("Live Market Signals")
-    data_scanner = get_stock_data(tickers)
+    st.subheader("Actionable Signals")
     
-    # Memberi warna pada kolom Signal
-    def color_signal(val):
-        color = 'red' if 'SELL' in str(val) else 'green' if 'BUY' in str(val) else 'black'
-        return f'color: {color}; font-weight: bold'
+    # Load data dari CSV atau list
+    try:
+        tickers = pd.read_csv('saham_list.csv')['Ticker'].tolist()
+    except:
+        tickers = ["BBCA.JK", "BBRI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK"]
 
-    if not data_scanner.empty:
-        st.dataframe(data_scanner.style.applymap(color_signal, subset=['Signal']), use_container_width=True)
+    with st.spinner("Memindai pasar..."):
+        df_scan = scan_saham(tickers)
+
+    # Fungsi untuk mewarnai tabel
+    def color_rows(val):
+        if "BUY" in str(val): return 'background-color: #d4edda; color: #155724'
+        if "SELL" in str(val): return 'background-color: #f8d7da; color: #721c24'
+        if "Up-Trend" in str(val): return 'color: green'
+        if "Down-Trend" in str(val): return 'color: red'
+        return ''
+
+    if not df_scan.empty:
+        # Menampilkan tabel dengan gaya CSS
+        st.dataframe(df_scan.style.applymap(color_rows, subset=['Actionable', 'Trend']), 
+                     use_container_width=True, 
+                     height=500)
     else:
-        st.write("Sedang mengambil data...")
+        st.error("Data tidak ditemukan.")
 
-# --- ISI TAB 2: HEATMAP ---
 with tab2:
-    st.subheader("Market Heatmap (Top Performers)")
-    if not data_scanner.empty:
-        fig = px.treemap(data_scanner, path=['Ticker'], values='Price',
-                         color='Change %', color_continuous_scale='RdYlGn',
-                         hover_data=['RSI'])
-        st.plotly_chart(fig, use_container_width=True)
+    st.info("Fitur Market Heatmap akan menampilkan visualisasi performa sektor.")
+    # Anda bisa menambahkan Plotly Treemap di sini
 
-# --- ISI TAB 3: ANALYSIS ---
 with tab3:
-    col1, col2 = st.columns()
-    with col1:
-        stock_to_analyze = st.selectbox("Pilih Saham:", tickers)
-    
-    with col2:
-        st.write(f"Menampilkan analisis mendalam untuk **{stock_to_analyze}**")
-        hist = yf.download(stock_to_analyze, period="6mo")
-        st.line_chart(hist['Close'])
+    st.info("Pilih saham di tabel untuk melihat grafik teknis mendalam.")
 
 # --- FOOTER ---
 st.markdown("---")
-st.caption("Aplikasi ini dibuat untuk tujuan edukasi. Pastikan analisis kembali sebelum melakukan trading.")
+st.markdown("© 2024 **Duplicate Infeksius Actio** | Data source: Yahoo Finance")
