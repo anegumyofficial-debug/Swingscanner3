@@ -7,132 +7,133 @@ from datetime import datetime
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Infectious Actio Clone", layout="wide", page_icon="📈")
 
-# --- 2. DATABASE SAHAM (Database Lengkap) ---
+# --- 2. STYLE CSS (REPLIKA VISUAL) ---
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: #ffffff; 
+        border-radius: 5px 5px 0px 0px; 
+        padding: 10px 20px;
+        font-weight: bold;
+    }
+    .stDataFrame { border: 1px solid #e6e9ef; border-radius: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 3. DATABASE SAHAM IDX ---
 TICKERS = [
     "BBCA.JK", "BBRI.JK", "BMRI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", 
     "BBNI.JK", "ADRO.JK", "UNVR.JK", "ANTM.JK", "CPIN.JK", "ICBP.JK",
     "MDKA.JK", "PGAS.JK", "PTBA.JK", "ITMG.JK", "AKRA.JK", "BRIS.JK"
 ]
 
-# --- 3. LOGIKA PENGAMBILAN DATA (Anti-Limit) ---
+# --- 4. DATA ENGINE (MASS DOWNLOAD & CACHE) ---
 @st.cache_data(ttl=3600)
-def load_market_data(tickers):
+def load_idx_data(tickers):
     try:
-        # Download massal agar efisien dan tidak kena blokir
+        # Mengambil data 1 tahun agar indikator stabil
         data = yf.download(tickers, period="1y", interval="1d", group_by='ticker', progress=False)
         return data
     except Exception:
         return None
 
-# --- 4. SIDEBAR (FILTER STRATEGI - Sama Persis Target) ---
+# --- 5. SIDEBAR (FILTER STRATEGI) ---
 with st.sidebar:
-    st.title("📊 INFECTIOUS ACTIO")
+    st.image("https://cdn-icons-png.flaticon.com/512/2422/2422796.png", width=50)
+    st.title("INFECTIOUS ACTIO")
     st.markdown("---")
-    st.header("🔍 Filter & Strategi")
+    st.header("🎯 Filter Strategi")
     
-    # Filter yang ada di website referensi
-    pilih_strategi = st.selectbox(
-        "Pilih Strategi:", 
-        ["Scalping (RSI < 30)", "Swing Trading (BB Bottom)", "Investment (Undervalued)"]
-    )
+    strat_type = st.radio("Mode Screening:", ["Swing Trading", "Day Scalping", "Long Invest"])
     
     st.markdown("---")
-    st.subheader("⚙️ Parameter")
-    min_rsi = st.slider("Min RSI", 0, 100, 30)
-    max_rsi = st.slider("Max RSI", 0, 100, 70)
-    
-    st.info("Scanner ini otomatis memfilter saham IDX yang masuk dalam area akumulasi.")
+    rsi_range = st.slider("Range RSI (Oversold/Overbought)", 0, 100, (30, 70))
+    st.info("Scanner akan menyaring saham berdasarkan area akumulasi Bollinger Bands.")
 
-# --- 5. MAIN CONTENT ---
-st.title("📈 Stock Screener Real-time")
-st.write(f"Update Terakhir: **{datetime.now().strftime('%d %M %Y %H:%M')}**")
+# --- 6. MAIN DASHBOARD ---
+st.title("📈 Market Scanner Real-time")
+st.write(f"Sinkronisasi Terakhir: **{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}**")
 
-# Tampilan Tab seperti target
 tab1, tab2, tab3 = st.tabs(["🕒 Day Scalping", "📅 Weekly Swing", "🏛️ Monthly Invest"])
 
-# Ambil Data
-raw_data = load_market_data(TICKERS)
+raw_data = load_idx_data(TICKERS)
 
-def run_screener(label):
+def process_screener(label):
     if raw_data is None or raw_data.empty:
-        st.error("Gagal menarik data dari IDX. Tunggu sebentar dan refresh (F5).")
+        st.error("Gagal menarik data dari server IDX. Mohon tunggu 1 menit dan refresh.")
         return
 
-    results = []
+    final_rows = []
     for t in TICKERS:
         try:
-            df = raw_data[t].dropna()
-            if len(df) < 30: continue
+            # Ambil data per ticker
+            df_t = raw_data[t].dropna()
+            if len(df_t) < 40: continue
             
-            # Indikator Teknikal
-            df['RSI'] = ta.rsi(df['Close'], length=14)
-            bb = ta.bbands(df['Close'], length=20, std=2)
-            df['MA20'] = ta.sma(df['Close'], length=20)
+            # Indikator Teknikal (Presisi)
+            df_t['RSI'] = ta.rsi(df_t['Close'], length=14)
+            df_t['EMA20'] = ta.ema(df_t['Close'], length=20)
+            bb = ta.bbands(df_t['Close'], length=20, std=2)
             
-            last = df.iloc[-1]
+            last = df_t.iloc[-1]
             last_bb = bb.iloc[-1]
             
             price = float(last['Close'])
-            rsi_v = float(last['RSI'])
+            rsi_val = float(last['RSI'])
+            ema_val = float(last['EMA20'])
             
-            # Ambil BB Lower & Upper secara aman
-            bbl = float(last_bb.iloc) # Kolom BBL
-            bbu = float(last_bb.iloc) # Kolom BBU
+            # Deteksi BBL/BBU secara dinamis (Anti-Crash)
+            bbl_col = [c for c in bb.columns if c.startswith('BBL')]
+            u_col = [c for c in bb.columns if c.startswith('BBU')]
+            l_band = float(last_bb[bbl_col])
+            u_band = float(last_bb[u_col])
             
-            # Logika Signal Persis Target
+            # Logic Sinyal Identik
             signal = "HOLD"
-            action_color = "white"
+            zone = "NEUTRAL"
+            trend = "🟢 Bullish" if price > ema_val else "🔴 Bearish"
             
-            if price <= bbl or rsi_v <= min_rsi:
+            if price <= l_band or rsi_val <= rsi_range:
                 signal = "BUY"
-                action_color = "#00ff00" # Hijau
-            elif price >= bbu or rsi_v >= max_rsi:
+                zone = "ACCUMULATION"
+            elif price >= u_band or rsi_val >= rsi_range[1]:
                 signal = "SELL"
-                action_color = "#ff4b4b" # Merah
+                zone = "DISTRIBUTION"
                 
-            results.append({
+            final_rows.append({
                 "STOCK": t.replace(".JK", ""),
                 "PRICE": int(price),
                 "SIGNAL": signal,
-                "RSI": round(rsi_v, 2),
-                "L-BAND": int(bbl),
-                "U-BAND": int(bbu),
-                "_color": action_color
+                "TREND": trend,
+                "ZONE": zone,
+                "RSI": round(rsi_val, 2),
+                "MA-20": int(ema_val)
             })
         except:
             continue
 
-    if results:
-        df_final = pd.DataFrame(results)
+    if final_rows:
+        df_display = pd.DataFrame(final_rows)
         
-        # Styling Tabel agar tampilan sinyal berwarna
+        # Styling baris sinyal (Hijau untuk BUY, Merah untuk SELL)
         def style_rows(row):
-            return [f'color: {row["_color"]}; font-weight: bold' if name == 'SIGNAL' else '' for name in row.index]
+            if row['SIGNAL'] == 'BUY':
+                return ['color: #28a745; font-weight: bold'] * len(row)
+            elif row['SIGNAL'] == 'SELL':
+                return ['color: #dc3545; font-weight: bold'] * len(row)
+            return [''] * len(row)
 
         st.dataframe(
-            df_final.drop(columns=['_color']).style.apply(style_rows, axis=1),
+            df_display.style.apply(style_rows, axis=1),
             width="stretch", 
             hide_index=True
         )
     else:
-        st.warning("Tidak ada saham yang masuk dalam kriteria saat ini.")
+        st.warning("Tidak ada saham yang memenuhi kriteria filter saat ini.")
 
-# Eksekusi Tab
-with tab1: run_screener("Daily")
-with tab2: run_screener("Weekly")
-with tab3: run_screener("Monthly")
-
-# --- 6. FOOTER / KALKULATOR (Opsi Tambahan) ---
-st.markdown("---")
-with st.expander("🧮 Kalkulator Average Down"):
-    col1, col2 = st.columns(2)
-    with col1:
-        p1 = st.number_input("Harga Beli 1", value=1000)
-        q1 = st.number_input("Lot 1", value=10)
-    with col2:
-        p2 = st.number_input("Harga Beli 2", value=800)
-        q2 = st.number_input("Lot 2", value=10)
-    
-    if (q1 + q2) > 0:
-        avg = ((p1 * q1) + (p2 * q2)) / (q1 + q2)
-        st.success(f"Harga Rata-rata: {avg:,.0f}")
+# Menjalankan fungsi di setiap tab
+with tab1: process_screener("Daily")
+with tab2: process_screener("Weekly")
+with tab3: process_screener("Monthly")
