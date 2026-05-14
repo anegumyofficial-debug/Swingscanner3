@@ -4,96 +4,102 @@ import yfinance as yf
 import pandas_ta as ta
 from datetime import datetime
 
-# --- CONFIGURATION ---
+# --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Infectious Actio Clone", layout="wide", page_icon="📈")
 
-# --- DATABASE SAHAM (IHSG) ---
+# --- 2. DATABASE TICKER IHSG ---
 TICKERS = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "BBNI.JK", "ADRO.JK", "UNVR.JK", "ANTM.JK", "MEDC.JK"]
 
-# --- DATA ENGINE (Anti-Limit & Anti-Crash) ---
+# --- 3. DATA ENGINE ---
 @st.cache_data(ttl=3600)
 def load_market_data(tickers):
     try:
-        # Download massal (lebih aman dari blokir) [cite: 1, 2]
+        # Download massal (lebih aman dari blokir)
         data = yf.download(tickers, period="6mo", interval="1d", group_by='ticker', progress=False)
         return data
     except Exception:
         return None
 
-# --- HEADER ---
+# --- 4. HEADER ---
 st.title("📈 Infectious Actio Scanner V.3")
 st.caption(f"Last Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 tab1, tab2, tab3 = st.tabs(["🕒 Day Scalping", "📅 Weekly Swing", "🏛️ Monthly Invest"])
 
+# Memuat data sekali saja untuk semua tab
 raw_data = load_market_data(TICKERS)
 
 def process_logic(label):
     if raw_data is None or raw_data.empty:
-        st.error("Gagal memuat data. Server Yahoo sedang membatasi akses (Rate Limit).") [cite: 7]
+        st.error("Gagal memuat data. Server sedang sibuk (Rate Limit).")
         return
 
     rows = []
     for t in TICKERS:
         try:
-            # Mengambil data per ticker [cite: 18]
-            df = raw_data[t].dropna()
-            if len(df) < 25: continue
+            # Ambil data spesifik ticker
+            df_t = raw_data[t].dropna()
+            if len(df_t) < 30: continue
             
-            # Indikator (BB & RSI) [cite: 37, 52]
-            df['RSI'] = ta.rsi(df['Close'], length=14)
-            bb = ta.bbands(df['Close'], length=20, std=2)
+            # Indikator (RSI & BB)
+            df_t['RSI'] = ta.rsi(df_t['Close'], length=14)
+            bb = ta.bbands(df_t['Close'], length=20, std=2)
             
-            latest = df.iloc[-1] [cite: 56, 64]
-            # Perbaikan TypeError: Mengambil nilai angka murni [cite: 26, 40]
-            price = float(latest['Close']) [cite: 57]
-            rsi_v = float(latest['RSI']) [cite: 58, 65]
+            # Ambil baris terakhir
+            last = df_t.iloc[-1]
+            last_bb = bb.iloc[-1]
             
-            # Mendeteksi nama kolom Bollinger Bands secara otomatis [cite: 52, 55, 63, 66]
-            l_col = [c for c in bb.columns if c.startswith('BBL')]
-            u_col = [c for c in bb.columns if c.startswith('BBU')]
+            # Definisi Variabel secara Eksplisit (Mencegah NameError)
+            price_val = float(last['Close'])
+            rsi_val = float(last['RSI'])
             
-            l_band = float(bb[l_col].iloc[-1])
-            u_band = float(bb[u_col].iloc[-1])
+            # Cari kolom BBL dan BBU secara dinamis
+            bbl_col = [c for c in bb.columns if c.startswith('BBL')]
+            bbu_col = [c for c in bb.columns if c.startswith('BBU')]
             
-            # Logic Sinyal [cite: 62, 67]
+            l_band = float(last_bb[bbl_col])
+            u_band = float(last_bb[bbu_col])
+            
+            # Logika Sinyal
             signal = "HOLD"
             zone = "NEUTRAL"
-            if price <= l_band or rsi_v < 35:
+            
+            if price_val <= l_band or rsi_val < 35:
                 signal = "BUY"
                 zone = "OVERSOLD"
-            elif price >= u_band or rsi_v > 70:
+            elif price_val >= u_band or rsi_val > 70:
                 signal = "SELL"
                 zone = "OVERBOUGHT"
                 
             rows.append({
                 "STOCK": t.replace(".JK", ""),
-                "PRICE": int(price),
+                "PRICE": int(price_val),
                 "SIGNAL": signal,
                 "ZONE": zone,
-                "RSI": round(rsi_v, 2)
+                "RSI": round(rsi_val, 2)
             })
-        except:
+        except Exception:
             continue
 
     if rows:
         df_display = pd.DataFrame(rows)
         
-        # PERBAIKAN ATTRIBUTEERROR: Ganti applymap menjadi map (untuk Streamlit terbaru)
-        def color_val(v):
-            if v == 'BUY': return 'color: #00ff00; font-weight: bold'
-            if v == 'SELL': return 'color: #ff4b4b; font-weight: bold'
+        # Pewarnaan Sinyal
+        def style_signal(val):
+            if val == 'BUY': return 'color: #00ff00; font-weight: bold'
+            if val == 'SELL': return 'color: #ff4b4b; font-weight: bold'
             return ''
         
-        # PERBAIKAN: Gunakan width="stretch" sebagai pengganti use_container_width [cite: 88, 90, 94]
+        # Gunakan width="stretch" (Fixing deprecation warning) 
         st.dataframe(
-            df_display.style.map(color_val, subset=['SIGNAL']), 
+            df_display.style.map(style_signal, subset=['SIGNAL']), 
             width="stretch", 
             hide_index=True
         )
     else:
         st.warning("Data belum tersedia untuk timeframe ini.")
 
-with tab1: process_logic("Daily") [cite: 105]
-with tab2: process_logic("Weekly") [cite: 106]
-with tab3: process_logic("Monthly") [cite: 107]
+# --- 5. EKSEKUSI TAB ---
+with tab1: process_logic("Daily")
+with tab2: process_logic("Weekly")
+with tab3: process_logic("Monthly")
