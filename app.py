@@ -2,119 +2,93 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import pandas_ta as ta
-from datetime import datetime
-import concurrent.futures
 
-# --- CONFIG ---
-st.set_page_config(page_title="Swing Trading Scanner", layout="wide")
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="Infectious Actio - Official Clone", layout="wide", page_icon="📈")
 
-# --- DATA SAHAM (Sesuai database IHSG) ---
-# Tambahkan kode saham lainnya sesuai keinginan
-TICKERS = ["BBRI.JK", "BBCA.JK", "BMRI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "AMRT.JK", "BBNI.JK", "ADRO.JK", "UNVR.JK"]
+# --- DATABASE SAHAM IHSG (Sesuai Target) ---
+TICKERS = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "AMRT.JK", "BBNI.JK", "ADRO.JK", "UNVR.JK", "CPIN.JK", "ICBP.JK"]
 
-# --- ANALYTICS ENGINE ---
-def fetch_and_analyze(ticker, label):
+# --- FUNGSI SCANNER ---
+@st.cache_data(ttl=3600) # Simpan data selama 1 jam agar tidak kena limit
+def get_market_data(tickers):
     try:
-        # Mengambil data 1 tahun agar MA200 & indikator stabil
-        df = yf.download(ticker, period="1y", interval="1d", progress=False)
-        if df.empty or len(df) < 50: return None
-        
-        # Kalkulasi Indikator Persis Target
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        bb = ta.bbands(df['Close'], length=20, std=2)
-        # Menggabungkan BB ke dataframe utama
-        df = pd.concat([df, bb], axis=1)
-        
-        # Ambil baris terakhir secara aman [cite: 59, 65]
-        latest = df.iloc[-1]
-        price = float(latest['Close'])
-        rsi_val = float(latest['RSI'])
-        
-        # Identifikasi kolom Bollinger Bands secara dinamis
-        bbl = float(latest.filter(like='BBL').iloc) # Lower Band [cite: 55]
-        bbu = float(latest.filter(like='BBU').iloc) # Upper Band
-        
-        # Logika Signal
-        signal = "HOLD"
-        color = "white"
-        if price <= bbl or rsi_val < 35:
-            signal = "BUY"
-            color = "#00ff00" # Hijau
-        elif price >= bbu or rsi_val > 70:
-            signal = "SELL"
-            color = "#ff4b4b" # Merah
-
-        return {
-            "Kode": ticker.replace(".JK", ""),
-            "Price": int(price),
-            "Signal": signal,
-            "RSI": round(rsi_val, 2),
-            "L-Band": int(bbl),
-            "U-Band": int(bbu),
-            "Timeframe": label
-        }
-    except Exception:
+        # Download massal (Lebih cepat & aman dari limit)
+        data = yf.download(tickers, period="3mo", interval="1d", group_by='ticker', progress=False)
+        return data
+    except:
         return None
 
-# --- UI LAYOUT ---
-st.title("📈 Infectious Actio Clone")
-st.caption(f"Last Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-# Sidebar
-with st.sidebar:
-    st.header("🔍 Control Panel")
-    st.subheader("Menu Utama")
-    opt = st.radio("Pilih Alat:", ["Screener Saham", "Kalkulator Average Down", "Harga Wajar"])
+def analyze_logic(df_ticker):
+    # Kalkulasi Indikator
+    df_ticker['RSI'] = ta.rsi(df_ticker['Close'], length=14)
+    bb = ta.bbands(df_ticker['Close'], length=20, std=2)
     
-    st.divider()
-    st.write("Status: **Active**")
-
-# Main Content
-if opt == "Screener Saham":
-    tab1, tab2, tab3 = st.tabs(["🕒 Day Scalping", "📅 Weekly Swing", "🏛️ Monthly Invest"])
+    last_row = df_ticker.iloc[-1]
+    price = last_row['Close']
+    rsi_v = last_row['RSI']
+    # Ambil Lower/Upper Band secara manual dari dataframe BB
+    l_band = bb.iloc[-1, 0] # BBL_20_2.0
+    u_band = bb.iloc[-1, 2] # BBU_20_2.0
     
-    def render_view(tab, label):
-        with tab:
-            results = []
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                future_to_ticker = {executor.submit(fetch_and_analyze, t, label): t for t in TICKERS}
-                for future in concurrent.futures.as_completed(future_to_ticker):
-                    data = future.result()
-                    if data: results.append(data)
-            
-            if results:
-                df_res = pd.DataFrame(results)
-                
-                # Styling Tabel agar Mirip
-                def style_signal(val):
-                    if val == 'BUY': return 'background-color: rgba(0, 255, 0, 0.2); color: #00ff00; font-weight: bold'
-                    if val == 'SELL': return 'background-color: rgba(255, 0, 0, 0.2); color: #ff4b4b; font-weight: bold'
-                    return ''
+    # Logic Sinyal Persis Target
+    signal = "HOLD"
+    color = "white"
+    if price <= l_band or rsi_v < 35:
+        signal = "BUY"
+        color = "#00ff00"
+    elif price >= u_band or rsi_v > 70:
+        signal = "SELL"
+        color = "#ff4b4b"
+        
+    return price, signal, rsi_v, l_band, u_band, color
 
-                st.dataframe(
-                    df_res.style.applymap(style_signal, subset=['Signal']),
-                    use_container_width=True,
-                    hide_index=True
-                )
-            else:
-                st.error("Gagal memuat data. Periksa koneksi atau limit API.")
+# --- TAMPILAN UTAMA ---
+st.title("📈 Infectious Actio Scanner")
 
-    render_view(tab1, "Daily")
-    render_view(tab2, "Weekly")
-    render_view(tab3, "Monthly")
+tab1, tab2, tab3 = st.tabs(["🕒 Day Scalping", "📅 Weekly Swing", "🏛️ Monthly Invest"])
 
-elif opt == "Kalkulator Average Down":
-    st.subheader("🧮 Kalkulator Average Down")
-    col1, col2 = st.columns(2)
-    with col1:
-        p1 = st.number_input("Harga Beli Awal", value=1000)
-        l1 = st.number_input("Lot Awal", value=10)
-    with col2:
-        p2 = st.number_input("Harga Beli Baru", value=800)
-        l2 = st.number_input("Lot Baru", value=10)
-    
-    total_modal = (p1 * l1 * 100) + (p2 * l2 * 100)
-    total_lot = l1 + l2
-    avg_price = total_modal / (total_lot * 100)
-    
-    st.metric("Harga Rata-rata Baru", f"{avg_price:,.2f}")
+raw_data = get_market_data(TICKERS)
+
+def render_tab(tab_name):
+    if raw_data is None or raw_data.empty:
+        st.error("Gagal memuat data dari Yahoo Finance. Coba refresh beberapa saat lagi.")
+        return
+
+    results = []
+    for t in TICKERS:
+        try:
+            ticker_df = raw_data[t].dropna()
+            price, sig, rsi, lb, ub, col = analyze_logic(ticker_df)
+            results.append({
+                "STOCK": t.replace(".JK", ""),
+                "PRICE": f"{price:,.0f}",
+                "SIGNAL": sig,
+                "RSI": f"{rsi:.2f}",
+                "L-BAND": f"{lb:,.0f}",
+                "U-BAND": f"{ub:,.0f}",
+                "_color": col
+            })
+        except:
+            continue
+
+    if results:
+        df_display = pd.DataFrame(results)
+        
+        # Styling baris berdasarkan sinyal
+        def style_rows(row):
+            return [f'color: {row["_color"]}; font-weight: bold' if name == 'SIGNAL' else '' for name in row.index]
+
+        st.dataframe(
+            df_display.drop(columns=['_color']).style.apply(style_rows, axis=1),
+            use_container_width=True,
+            hide_index=True
+        )
+
+with tab1: render_tab("Day")
+with tab2: render_tab("Week")
+with tab3: render_tab("Month")
+
+# --- FOOTER ---
+st.divider()
+st.caption("Data diperbarui otomatis setiap jam untuk menghindari pembatasan API.")
