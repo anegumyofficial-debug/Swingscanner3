@@ -76,17 +76,22 @@ def load_all_indonesia_tickers():
 master_tickers_jk = load_all_indonesia_tickers()
 master_tickers_clean = [t.replace(".JK", "") for t in master_tickers_jk]
 
-# --- 4. DATA CLEANING UTILITY (Sempurnakan Perataan Kolom MultiIndex) ---
+# --- 4. DATA CLEANING UTILITY (Rombak Total untuk Proteksi Kolom Tunggal) ---
 def clean_yf_dataframe(df):
     if df is None or df.empty:
         return None
     
-    # Jika kolom berbentuk MultiIndex berlapis dari yfinance, ratakan ke level 0 ('Close', 'Open', dll)
+    # Ratakan struktur MultiIndex jika dideteksi dari yfinance
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
         
-    # Pastikan nama kolom bertipe string tanpa spasi kosong
+    # Salin data untuk menghindari penulisan pada slice dataframe asli
+    df = df.copy()
+    
+    # Paksa nama kolom menjadi string bersih tunggal tanpa spasi samping
     df.columns = [str(col).strip() for col in df.columns]
+    
+    # Reset index jika index berupa tanggal agar penataan manipulasi baris aman
     df.index = pd.to_datetime(df.index)
     return df
 
@@ -230,4 +235,66 @@ with tab2:
             y=df_chart['Change %'],
             marker_color=['#28a745' if change > 0 else '#dc3545' for change in df_chart['Change %']]
         ))
-        fig_bar.update_layout(title="Perubahan Harga Saham (%) Hari Ini (Maks. 40 Emiten)", yaxis_title="Persentase Perubahan", template="plotly
+        fig_bar.update_layout(title="Perubahan Harga Saham (%) Hari Ini (Maks. 40 Emiten)", yaxis_title="Persentase Perubahan", template="plotly_white")
+        st.plotly_chart(fig_bar, use_container_width=True)
+    else:
+        st.warning("Data visualisasi belum tersedia. Jalankan scanner di Tab 1 terlebih dahulu.")
+
+# --- TAB 3: INTERACTIVE ANALYSIS ---
+with tab3:
+    st.subheader(f"Analisis Teknikal Mendalam: {selected_stock}")
+    
+    ticker_jk = f"{selected_stock}.JK"
+    df_stock = get_single_stock_data(ticker_jk)
+    
+    if df_stock is not None and not df_stock.empty and len(df_stock) >= 2 and 'Close' in df_stock.columns:
+        try:
+            # Memastikan pengambilan data harga dikonversi ke tipe data float murni tunggal
+            c_price = float(df_stock['Close'].iloc[-1])
+            p_price = float(df_stock['Close'].iloc[-2])
+            
+            diff = c_price - p_price
+            pct = (diff / p_price) * 100
+            rsi_val = float(df_stock['RSI'].iloc[-1])
+            ma50_val = float(df_stock['MA50'].iloc[-1])
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(label="Harga Terakhir", value=f"Rp {c_price:,.0f}", delta=f"{diff:+.0f} ({pct:+.2f}%)")
+            with col2:
+                delta_rsi = "Oversold (<35)" if rsi_val < 35 else ("Overbought (>70)" if rsi_val > 70 else "Neutral")
+                st.metric(label="RSI (14)", value=f"{rsi_val:.2f}", delta=delta_rsi)
+            with col3:
+                delta_ma = "Di atas MA50 (Bullish)" if c_price > ma50_val else "Di bawah MA50 (Bearish)"
+                st.metric(label="Posisi MA50", value=f"Rp {ma50_val:,.0f}", delta=delta_ma)
+            
+            # Konversi kolom ke series satu dimensi eksplisit untuk menjamin keamanan rendering plotly
+            fig = go.Figure()
+            fig.add_trace(go.Candlestick(
+                x=df_stock.index,
+                open=df_stock['Open'].squeeze(), 
+                high=df_stock['High'].squeeze(),
+                low=df_stock['Low'].squeeze(), 
+                close=df_stock['Close'].squeeze(),
+                name="Harga Saham"
+            ))
+            
+            fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA20'].squeeze(), line=dict(color='orange', width=1.5), name="MA 20"))
+            fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA50'].squeeze(), line=dict(color='blue', width=1.5), name="MA 50"))
+            
+            fig.update_layout(
+                title=f"Grafik Historis {selected_stock} (1 Tahun Terakhir)",
+                xaxis_title="Tanggal", yaxis_title="Harga (IDR)",
+                xaxis_rangeslider_visible=False, template="plotly_white",
+                height=500, hovermode="x unified"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+        except Exception as e:
+            st.error(f"Terjadi kesalahan teknis saat merender grafik: {str(e)}")
+    else:
+        st.warning(f"⚠️ Yahoo Finance tidak mengembalikan data untuk {selected_stock}. Silakan coba pilih kode saham lain.")
+
+# --- 11. FOOTER ---
+st.markdown("---")
+st.markdown(f"© {datetime.now().year} **SwingScanner Pro** | Menggunakan Streamlit Modern | Data Source: Yahoo Finance")
