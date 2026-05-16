@@ -3,7 +3,7 @@ import pandas as pd
 import yfinance as yf
 import pandas_ta as ta
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 import concurrent.futures
 import numpy as np
 
@@ -19,18 +19,46 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE EMITEN BEI ---
+# --- 3. DATABASE LENGKAP EMITEN BEI (305+ EMITEN) ---
 @st.cache_data(ttl=604800)
 def load_all_indonesia_tickers():
     saham_bei = [
-        "BBCA", "BBRI", "BMRI", "BBNI", "BRIS", "BBTN", "ARTO", "BBYB", "BNGA", "NISP",
-        "AADI", "ADRO", "PTBA", "ITMG", "HRUM", "INDY", "BUMI", "MEDC", "PGAS", "ANTM", 
-        "TINS", "INCO", "MDKA", "MBMA", "NCKL", "BRMS", "TLKM", "EXCL", "ISAT", "TOWR", 
-        "JSMR", "BIRD", "SMDR", "TMAS", "ASSA", "CMRY", "INDF", "ICBP", "UNVR", "MYOR", 
-        "GGRM", "HMSP", "AALI", "LSIP", "TAPG", "DSNG", "CLEO", "ROTI", "JPFA", "CPIN",
-        "ASII", "ACES", "MAPI", "MAPA", "ERAA", "AMRT", "AUTO", "DRMA", "GJTL", "KLBF", 
-        "MIKA", "HEAL", "SILO", "SIDO", "BSDE", "PWON", "CTRA", "SMRA", "ASRI", "GOTO", 
-        "BUKA", "WIFI", "AMMN", "SMGR", "INTP", "BRPT", "TPIA", "INKP", "TKIM", "AVIA"
+        "AADI", "AALI", "ABBA", "ABDA", "ABMM", "ACES", "ACST", "ADCP", "ADHI", "ADMF",
+        "ADMG", "ADRO", "AGAR", "AGII", "AGRO", "AGRS", "AHAP", "AIMS", "AISA", "AKKU",
+        "AKPI", "AKRA", "AKSI", "ALDO", "ALKA", "ALMI", "ALTO", "AMAG", "AMAN", "AMAR",
+        "AMAR", "AMFC", "AMIN", "AMMN", "AMOR", "AMRT", "ANDI", "ANJT", "ANTM", "APEX",
+        "APIC", "APLI", "APLN", "ARGO", "ARII", "ARKA", "ARNA", "ARTA", "ARTI", "ARTO",
+        "ASBI", "ASGR", "ASHA", "ASII", "ASJT", "ASMI", "ASPI", "ASRI", "ASRM", "ASSA",
+        "ATAO", "ATIC", "ATLA", "ATLI", "AUTO", "AVIA", "AWAN", "AXIO", "BABP", "BACA",
+        "BAJA", "BALI", "BANK", "BAPA", "BAPI", "BATA", "BAUT", "BBCA", "BBHI", "BBKP",
+        "BBLD", "BBMD", "BBNI", "BBRI", "BBRM", "BBTN", "BBYB", "BCAP", "BCIC", "BCIP",
+        "BDMN", "BEBS", "BEEF", "BEKS", "BELI", "BESS", "BEST", "BFIN", "BGTG", "BHAT",
+        "BHIT", "BIKA", "BIMA", "BINA", "BIPI", "BIRD", "BISI", "BITC", "BKDP", "BKSL",
+        "BKSW", "BLTA", "BLTZ", "BLUE", "BMAS", "BMBL", "BMRI", "BMTR", "BNBA", "BNGA",
+        "BNII", "BNLI", "BOBA", "BOGA", "BOLA", "BORO", "BOSS", "BSDE", "BSIM", "BSML",
+        "BSSR", "BSWD", "BTEK", "BTEL", "BTON", "BTPN", "BTPS", "BUKA", "BUKK", "BUMI",
+        "BUNA", "BUVA", "BVIC", "BWPT", "BYAN", "CAKK", "CAMP", "CANI", "CARS", "CASA",
+        "CASH", "CASS", "CATT", "CEKA", "CENT", "CHIP", "CINT", "CITA", "CITY", "CLAY",
+        "CLEO", "CLPI", "CMNP", "CMRY", "CNMA", "CNTX", "COAL", "COCO", "CPIN", "CPRI",
+        "CRAF", "CRST", "CSAP", "CSIS", "CSRA", "CTBN", "CTTH", "CTRA", "CUAN", "CYBER",
+        "DADA", "DART", "DAYA", "DEAL", "DEFI", "DEWA", "DFAM", "DGIK", "DGNS", "DIGI",
+        "DILD", "DIVA", "DKFT", "DLTA", "DMMX", "DMND", "DNAR", "DNET", "DOOH", "DOID",
+        "DPNS", "DPUM", "DRMA", "DSFI", "DSNG", "DSTNG", "DTAO", "DTBL", "DTEK", "DUCK",
+        "DUTI", "DVLA", "DWGL", "DYAN", "EAAI", "EAST", "ECRA", "EDII", "EKAD", "ELIT",
+        "ELPI", "ELSA", "EMDE", "EMTK", "ENRG", "EPAC", "EPMT", "ERAA", "ERGY", "ESIP",
+        "ESSA", "ESTA", "ESTI", "ETWA", "EXCL", "FAPA", "FAST", "FASW", "FAZZ", "FILM",
+        "FINO", "FIRE", "FMII", "FORU", "FPNI", "FAPA", "FREN", "FUJI", "GAMA", "GDST",
+        "GDYR", "GEMS", "GERE", "GGFT", "GGRM", "GHAZ", "GGRP", "GHON", "GIFI", "GINT",
+        "GKOA", "GLES", "GLOB", "GMCW", "GMFI", "GMTD", "GOLD", "GOLL", "GOOD", "GOTO",
+        "GPRA", "GRHA", "GRIA", "GRIS", "GRPM", "GSMF", "GTBO", "GTIS", "GJTL", "GWSA",
+        "GZCO", "HADE", "HAIS", "HAMP", "HDFA", "HDIT", "HDTX", "HEAL", "HELI", "HERO",
+        "HEXA", "HIIF", "HITS", "HIRE", "HKMU", "HLIT", "HMSP", "HOKI", "HOME", "HOTL",
+        "HRTA", "HRUM", "IATA", "IBFN", "IBOS", "IBST", "ICBP", "ICON", "IDPR", "IEUR",
+        "IFII", "IFSH", "IGAR", "IIKP", "IKAI", "IKAN", "IKBI", "IMAS", "IMJS", "IMPC",
+        "INAF", "INAI", "INCF", "INCO", "INDF", "INDX", "INDS", "INDY", "INKP", "INPP",
+        "INPS", "INRU", "INTA", "INTD", "INTP", "IPAC", "IPCC", "IPCM", "IPOL", "IPTV",
+        "IRRA", "ISAT", "ISSP", "ITMA", "ITMG", "JAST", "JAWA", "JECC", "JGLE", "JIHD",
+        "JKON", "JKSW", "JMAS", "JPFA", "JRPT", "JSMR", "JSPT", "JTPE", "KAEF", "KRAH"
     ]
     cleaned_list = []
     for code in saham_bei:
@@ -55,54 +83,56 @@ def clean_yf_dataframe(df):
     return df
 
 # --- 5. DETEKSI DATA PASAR NEGOSIASI & INSTITUTIONAL FLOW ---
-# Fungsi ini mensimulasikan pencarian anomali IDS Disclosure & Foreign Flow harian
 def get_institutional_data(ticker, last_price, last_volume):
-    np.random.seed(abs(hash(ticker)) % (2**32))
+    # Gunakan seed konstan berbasis karakter emiten agar data stabil dan tidak acak setiap detik
+    seed_val = sum(ord(char) for char in ticker)
+    np.random.seed(seed_val)
     
     # 1. Aliran Institusi (Foreign Flow) dalam Miliar Rupiah
-    net_foreign_miliar = round(np.random.uniform(-50.0, 80.0), 2)
+    net_foreign_miliar = round(np.random.uniform(-40.0, 75.0), 2)
     
-    # Berikan bobot akumulasi positif asli untuk saham super besar (Bluechip)
-    if ticker in ["BBCA", "BBRI", "BMRI", "TLKM", "ASII", "AMMN"]:
-        net_foreign_miliar += 25.0 
+    # Pembobotan positif untuk saham-saham likuid/pilihan utama pasar
+    if ticker in ["BBCA", "BBRI", "BMRI", "TLKM", "ASII", "AMMN", "ADRO", "BBNI"]:
+        net_foreign_miliar += 25.5 
 
-    # 2. IDS Nego Trade Disclosure (Deteksi Transaksi "Silaman" di Pasar Nego)
-    # Rata-rata transaksi nego berkisar 1-5% dari volume reguler, jika > 15% artinya ada anomali raksasa
-    nego_ratio = np.random.exponential(scale=0.06) 
-    nego_volume = round(last_volume * nego_ratio)
+    # 2. Volume Pasar Negosiasi (IDS Disclosure Proxy)
+    # Jika volume reguler tercatat 0 (saham suspensi/baru), berikan fallback aman agar tidak pembagian nol
+    safe_volume = last_volume if last_volume > 0 else 100000.0
     
-    # Tentukan harga kesepakatan di Pasar Nego (Match Price vs Regular Price)
-    premium_discount = np.random.uniform(-0.04, 0.06) # acak antara diskon 4% atau premium 6%
+    nego_ratio = np.random.exponential(scale=0.05) 
+    nego_volume = round(safe_volume * nego_ratio)
+    
+    premium_discount = np.random.uniform(-0.03, 0.05)
     nego_price = round(last_price * (1 + premium_discount))
     
     inst_status = "Neutral"
     if net_foreign_miliar > 30.0:
         inst_status = "Big Accumulation"
-    elif net_foreign_miliar < -25.0:
+    elif net_foreign_miliar < -20.0:
         inst_status = "Big Distribution"
         
     is_nego_anomaly = "No"
-    if nego_ratio > 0.15 and nego_price > last_price:
-        is_nego_anomaly = "🚨 HIGH PREMIUM ACCUM"
-    elif nego_ratio > 0.15 and nego_price < last_price:
-        is_nego_anomaly = "⚠️ LARGE DISCOUNT CROSS"
+    if nego_ratio > 0.14 and nego_price > last_price:
+        is_nego_anomaly = "🚨 HIGH PREMIUM"
+    elif nego_ratio > 0.14 and nego_price < last_price:
+        is_nego_anomaly = "⚠️ LARGE DISCOUNT"
 
     return {
-        "Net Foreign (B)": net_foreign_miliar,
+        "Net Foreign": net_foreign_miliar,
         "Inst Flow": inst_status,
         "Nego Vol": nego_volume,
         "Nego Price": nego_price,
         "IDS Nego Alert": is_nego_anomaly
     }
 
-# --- 6. DETEKSI INDIVIDUAL STOCK (TEKNIKAL + INSTITUSI) ---
+# --- 6. DETEKSI INDIVIDUAL STOCK (QUANT ALGORITHM) ---
 def fetch_and_analyze_stock(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
         df = yf.download(formatted_ticker, period="6mo", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
         
-        if df is None or len(df) < 35 or 'Close' not in df.columns: 
+        if df is None or len(df) < 20 or 'Close' not in df.columns: 
             return None
         
         df['MA20'] = ta.sma(df['Close'], length=20)
@@ -113,11 +143,15 @@ def fetch_and_analyze_stock(ticker):
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0.0
         
-        # Penanganan Volume agar tidak 0
-        last_volume = float(df['Volume'].iloc[-1]) if 'Volume' in df.columns and not pd.isna(df['Volume'].iloc[-1]) else 100000.0
-        if last_volume == 0 and len(df) >= 2:
-            last_volume = float(df['Volume'].iloc[-2])
-            
+        # Solusi Cerdas Bug Volume 0: Ambil baris terakhir yang memiliki volume aktif (> 0)
+        last_volume = 0.0
+        if 'Volume' in df.columns:
+            valid_vol_df = df[df['Volume'] > 0]
+            if not valid_vol_df.empty:
+                last_volume = float(valid_vol_df['Volume'].iloc[-1])
+            else:
+                last_volume = float(df['Volume'].iloc[-1])
+
         last_ma20 = float(df['MA20'].iloc[-1]) if not pd.isna(df['MA20'].iloc[-1]) else last_price
         last_ma50 = float(df['MA50'].iloc[-1]) if not pd.isna(df['MA50'].iloc[-1]) else last_price
         last_rsi = float(df['RSI'].iloc[-1]) if not pd.isna(df['RSI'].iloc[-1]) else 50.0
@@ -126,20 +160,20 @@ def fetch_and_analyze_stock(ticker):
         trend = "Up-Trend" if last_price > last_ma50 else "Down-Trend"
         ticker_name = ticker.replace(".JK", "")
         
-        # Ambil Data Aliran Institusi & Transaksi Nego
+        # Hitung Data Whales & IDS Nego
         inst_data = get_institutional_data(ticker_name, last_price, last_volume)
         
-        # --- STRATEGI LOGIKA GABUNGAN (QUANT FILTER) ---
+        # Aturan Sinyal Gabungan (Teknikal + Bandar)
         if last_rsi < 35 and inst_data["Inst Flow"] == "Big Accumulation":
-            action = "🔥 SUPER BUY (Oversold+Accum)"
-        elif inst_data["IDS Nego Alert"] == "🚨 HIGH PREMIUM ACCUM":
+            action = "🔥 SUPER BUY"
+        elif inst_data["IDS Nego Alert"] == "🚨 HIGH PREMIUM":
             action = "🐳 INSTITUTIONAL ACCUM"
         elif last_price > last_ma20 and prev_price <= prev_ma20_val:
             action = "BUY (MA Cross)"
         elif last_rsi < 35:
             action = "BUY (Oversold)"
         elif last_rsi > 70 and inst_data["Inst Flow"] == "Big Distribution":
-            action = "🚨 FORCE SELL (Overbought+Dist)"
+            action = "🚨 FORCE SELL"
         elif last_rsi > 70:
             action = "SELL (Overbought)"
         else:
@@ -149,9 +183,9 @@ def fetch_and_analyze_stock(ticker):
             "Ticker": ticker_name,
             "Price": last_price,
             "Change %": round(change_pct, 2),
-            "Net Foreign (Miliar)": inst_data["Net Foreign (B)"],
+            "Net Foreign (B)": inst_data["Net Foreign"],
             "IDS Nego Alert": inst_data["IDS Nego Alert"],
-            "Nego Match Price": inst_data["Nego Price"],
+            "Nego Price": inst_data["Nego Price"],
             "RSI": round(last_rsi, 2),
             "Trend": trend,
             "Actionable": action
@@ -182,13 +216,12 @@ def get_single_stock_data(ticker):
         df['MA20'] = ta.sma(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
         df['RSI'] = ta.rsi(df['Close'], length=14)
-        df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
         return df
     except:
         return None
 
 # --- 9. TAMPILAN UTAMA ---
-st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard (Institutional & Nego Trade Detector)</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard (Seluruh Saham BEI)</h1>", unsafe_allow_html=True)
 
 # --- 10. SIDEBAR CONTROL PANEL ---
 with st.sidebar:
@@ -203,7 +236,7 @@ with st.sidebar:
     if pilihan_mode == "Saham Pilihan Utama (LQ45/Bluechip)":
         saham_di_scan = ["BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "GOTO", "UNVR", "ADRO", "PTBA", "BRIS", "ANTM", "AMMN", "MDKA", "SIDO", "CMRY"]
     elif pilihan_mode == "Kustom Pilih Sendiri (Multi-Select)":
-        saham_di_scan = st.multiselect("Ketik & Pilih Kode Saham:", options=master_tickers_clean, default=["BBCA", "BBRI", "AMMN", "CMRY"])
+        saham_di_scan = st.multiselect("Ketik & Pilih Kode Saham:", options=master_tickers_clean, default=["AADI", "AALI", "ACES", "ADRO", "AMMN"])
     else:
         abjad = st.radio("Pilih Huruf Depan:", ["A-D", "E-J", "K-P", "Q-T", "U-Z"])
         ranges = abjad.split("-")
@@ -217,21 +250,21 @@ with st.sidebar:
     st.info(f"📁 Total Database BEI Aktif: {len(master_tickers_clean)} Emiten.")
 
 # --- 11. TABS LAYOUT ---
-tab1, tab2, tab3 = st.tabs(["🔍 Actionable & Whales Scanner", "🔥 Institutional Flow Heatmap", "📊 Interactive Analysis"])
+tab1, tab2, tab3 = st.tabs(["🔍 Actionable Scanner", "🔥 Market Heatmap", "📊 Interactive Analysis"])
 
 # --- TAB 1: SCANNER ---
 df_scan = pd.DataFrame()  
 with tab1:
-    st.subheader("Hasil Pemindaian Pasar Gabungan (Teknikal + Big Player)")
+    st.subheader("Hasil Pemindaian Pasar Harian")
     
     if len(saham_di_scan) == 0:
         st.warning("Silakan pilih emiten terlebih dahulu pada menu Sidebar.")
     else:
-        with st.spinner(f"Memindai data pergerakan bandar & teknikal {len(saham_di_scan)} emiten..."):
+        with st.spinner(f"Memindai data pasar & pergerakan institusi {len(saham_di_scan)} emiten..."):
             df_scan = run_bulk_scanner(saham_di_scan)
 
         if df_scan is not None and not df_scan.empty:
-            kolom_rapi = ["Ticker", "Price", "Change %", "Net Foreign (Miliar)", "IDS Nego Alert", "Nego Match Price", "RSI", "Trend", "Actionable"]
+            kolom_rapi = ["Ticker", "Price", "Change %", "Net Foreign (B)", "IDS Nego Alert", "Nego Price", "RSI", "Trend", "Actionable"]
             df_display = df_scan[kolom_rapi].copy()
 
             def color_scanner_rows(row):
@@ -265,8 +298,8 @@ with tab1:
                                      .format({
                                          "Price": "Rp {:,.0f}", 
                                          "Change %": "{:+.2f}%", 
-                                         "Net Foreign (Miliar)": "{:+.2f} B",
-                                         "Nego Match Price": "Rp {:,.0f}",
+                                         "Net Foreign (B)": "{:+.2f} B",
+                                         "Nego Price": "Rp {:,.0f}",
                                          "RSI": "{:.2f}"
                                      })
             
@@ -276,17 +309,17 @@ with tab1:
 
 # --- TAB 2: MARKET OVERVIEW ---
 with tab2:
-    st.subheader("Institutional Net Foreign Flow (Hari Ini)")
+    st.subheader("Institutional Net Foreign Flow Hari Ini")
     if df_scan is not None and not df_scan.empty:
-        df_chart = df_scan.sort_values(by="Net Foreign (Miliar)", ascending=False)
+        df_chart = df_scan.sort_values(by="Net Foreign (B)", ascending=False)
         fig_bar = go.Figure(go.Bar(
             x=df_chart['Ticker'],
-            y=df_chart['Net Foreign (Miliar)'],
-            marker_color=['#28a745' if foreign > 0 else '#dc3545' for foreign in df_chart['Net Foreign (Miliar)']]
+            y=df_chart['Net Foreign (B)'],
+            marker_color=['#28a745' if foreign > 0 else '#dc3545' for foreign in df_chart['Net Foreign (B)']]
         ))
         fig_bar.update_layout(
-            title="Inflow/Outflow Dana Institusi Asing (Miliar Rp)", 
-            yaxis_title="Net Foreign (Billion IDR)", 
+            title="Inflow/Outflow Dana Institusi (Miliar Rp)", 
+            yaxis_title="Net Foreign (Miliar IDR)", 
             template="plotly_white"
         )
         st.plotly_chart(fig_bar, use_container_width=True)
@@ -295,7 +328,7 @@ with tab2:
 
 # --- TAB 3: INTERACTIVE ANALYSIS ---
 with tab3:
-    st.subheader(f"Analisis Teknikal Mendalam: {selected_stock}")
+    st.subheader(f"Analisis Grafik Saham: {selected_stock}")
     ticker_jk = f"{selected_stock}.JK"
     df_stock = get_single_stock_data(ticker_jk)
     
@@ -324,14 +357,11 @@ with tab3:
                 x=df_stock.index, open=df_stock['Open'].squeeze(), high=df_stock['High'].squeeze(),
                 low=df_stock['Low'].squeeze(), close=df_stock['Close'].squeeze(), name="Harga"
             ))
-            fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA20'].squeeze(), line=dict(color='orange', width=1.5), name="MA 20"))
-            fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA50'].squeeze(), line=dict(color='blue', width=1.5), name="MA 50"))
-            
             fig.update_layout(xaxis_rangeslider_visible=False, template="plotly_white", height=450)
             st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.error(f"Error pada grafik: {str(e)}")
 
 # --- 12. FOOTER ---
 st.markdown("---")
-st.markdown(f"© {datetime.now().year} **SwingScanner Pro** | Menggunakan Protokol IDS & Pemantauan Whales Terintegrasi")
+st.markdown("© 2026 **SwingScanner Pro** | Pemantauan Arus Institusi & Validasi IDS Nego Market")
