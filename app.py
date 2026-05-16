@@ -70,4 +70,172 @@ def load_all_indonesia_tickers():
         # --- PERINDUSTRIAN, KIMIA & MATERIAL DASAR ---
         "AMMN", "SMGR", "INTP", "BRPT", "TPIA", "INKP", "TKIM", "ANJT", "LTLS", "UNIC", 
         "AGII", "ESSA", "TOTO", "AVIA", "MARK", "ALKA", "AKPI", "ALMI", "BAJA", "BRAM", 
-        "BRNA", "GDST", "IGAR", "IMPC",
+        "BRNA", "GDST", "IGAR", "IMPC", "INAI", "INCI", "KRAS", "LION", "LMSH", "NIKL"
+    ]
+    
+    cleaned_list = []
+    for code in saham_bei:
+        c_clean = str(code).strip().upper()
+        if not c_clean.endswith(".JK"):
+            c_clean = f"{c_clean}.JK"
+        cleaned_list.append(c_clean)
+        
+    return sorted(list(set(cleaned_list)))
+
+master_tickers_jk = load_all_indonesia_tickers()
+master_tickers_clean = [t.replace(".JK", "") for t in master_tickers_jk]
+
+# --- 4. DATA CLEANING UTILITY ---
+def clean_yf_dataframe(df):
+    if df is None or df.empty:
+        return None
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    
+    df = df.copy()
+    df.columns = [str(col).strip() for col in df.columns]
+    df.index = pd.to_datetime(df.index)
+    return df
+
+# --- 5. DETEKSI INDIVIDUAL STOCK ---
+def fetch_and_analyze_stock(ticker):
+    try:
+        formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
+        df = yf.download(formatted_ticker, period="6mo", interval="1d", progress=False)
+        df = clean_yf_dataframe(df)
+        
+        if df is None or len(df) < 35 or 'Close' not in df.columns: 
+            return None
+        
+        df['MA20'] = ta.sma(df['Close'], length=20)
+        df['MA50'] = ta.sma(df['Close'], length=50)
+        df['RSI'] = ta.rsi(df['Close'], length=14)
+        
+        last_price = float(df['Close'].iloc[-1])
+        prev_price = float(df['Close'].iloc[-2])
+        change_pct = ((last_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0.0
+        
+        last_volume = float(df['Volume'].iloc[-1]) if 'Volume' in df.columns and not pd.isna(df['Volume'].iloc[-1]) else 0.0
+        
+        raw_ma20 = df['MA20'].iloc[-1]
+        last_ma20 = float(raw_ma20) if not pd.isna(raw_ma20) else last_price
+        
+        raw_ma50 = df['MA50'].iloc[-1]
+        last_ma50 = float(raw_ma50) if not pd.isna(raw_ma50) else last_price
+        
+        raw_rsi = df['RSI'].iloc[-1]
+        last_rsi = float(raw_rsi) if not pd.isna(raw_rsi) else 50.0
+        
+        prev_ma20_raw = df['MA20'].iloc[-2]
+        prev_ma20_val = float(prev_ma20_raw) if not pd.isna(prev_ma20_raw) else prev_price
+        
+        trend = "Up-Trend" if last_price > last_ma50 else "Down-Trend"
+        
+        if last_price > last_ma20 and last_price > last_ma50:
+            keterangan = "Diatas MA20 & MA50 (Strong)"
+        elif last_price > last_ma20:
+            keterangan = "Diatas MA20"
+        elif last_price > last_ma50:
+            keterangan = "Diatas MA50"
+        else:
+            keterangan = "Dibawah MA Harian"
+            
+        if last_rsi < 35:
+            action = "BUY (Oversold)"
+        elif last_price > last_ma20 and prev_price <= prev_ma20_val:
+            action = "BUY (MA Cross)"
+        elif last_rsi > 70:
+            action = "SELL (Overbought)"
+        else:
+            action = "Wait/Neutral"
+        
+        return {
+            "Ticker": ticker.replace(".JK", ""),
+            "Price": last_price,
+            "Change %": round(change_pct, 2),
+            "Volume": last_volume,
+            "MA20": round(last_ma20, 1),
+            "MA50": round(last_ma50, 1),
+            "RSI": round(last_rsi, 2),
+            "Trend": trend,
+            "Keterangan": keterangan,
+            "Actionable": action
+        }
+    except:
+        return None
+
+# --- 6. CORE BULK SCANNER ---
+@st.cache_data(ttl=600) 
+def run_bulk_scanner(ticker_list):
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        future_to_ticker = {executor.submit(fetch_and_analyze_stock, t): t for t in ticker_list}
+        for future in concurrent.futures.as_completed(future_to_ticker):
+            res = future.result()
+            if res is not None:
+                results.append(res)
+    return pd.DataFrame(results)
+
+# --- 7. SINGLE STOCK FETCH ---
+@st.cache_data(ttl=120)
+def get_single_stock_data(ticker):
+    try:
+        df = yf.download(ticker, period="1y", interval="1d", progress=False)
+        df = clean_yf_dataframe(df)
+        if df is None or len(df) < 20 or 'Close' not in df.columns:
+            return None
+        df['MA20'] = ta.sma(df['Close'], length=20)
+        df['MA50'] = ta.sma(df['Close'], length=50)
+        df['RSI'] = ta.rsi(df['Close'], length=14)
+        df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+        return df
+    except:
+        return None
+
+# --- 8. TAMPILAN UTAMA ---
+st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard (Seluruh Saham BEI)</h1>", unsafe_allow_html=True)
+
+# --- 9. SIDEBAR CONTROL PANEL ---
+with st.sidebar:
+    st.header("⚙️ Control Panel")
+    st.subheader("🌐 Saring Kelompok Scanner")
+    
+    pilihan_mode = st.radio(
+        "Pilih Cakupan Emiten:", 
+        ["Saham Pilihan Utama (LQ45/Bluechip)", "Kustom Pilih Sendiri (Multi-Select)", "Scan Berdasarkan Kelompok Abjad"]
+    )
+    
+    if pilihan_mode == "Saham Pilihan Utama (LQ45/Bluechip)":
+        saham_di_scan = ["BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "GOTO", "UNVR", "ADRO", "PTBA", "BRIS", "ANTM", "INDF", "ICBP", "KLBF", "AMMN", "MDKA", "SIDO", "AADI", "CMRY"]
+    elif pilihan_mode == "Kustom Pilih Sendiri (Multi-Select)":
+        saham_di_scan = st.multiselect("Ketik & Pilih Kode Saham:", options=master_tickers_clean, default=["BBCA", "BBRI", "AADI", "CMRY"])
+    else:
+        abjad = st.radio("Pilih Huruf Depan:", ["A-D", "E-J", "K-P", "Q-T", "U-Z"])
+        ranges = abjad.split("-")
+        saham_di_scan = [t for t in master_tickers_clean if len(t) > 0 and ranges <= t <= ranges]
+
+    st.markdown("---")
+    st.subheader("🔍 Grafik Detail")
+    selected_stock = st.selectbox("Pilih Saham untuk Grafik Detail (Tab 3):", options=master_tickers_clean, index=0)
+    
+    st.markdown("---")
+    st.info(f"📁 Total Database BEI Aktif: {len(master_tickers_clean)} Emiten.")
+
+# --- 10. TABS LAYOUT ---
+tab1, tab2, tab3 = st.tabs(["🔍 Actionable Scanner", "🔥 Market Heatmap", "📊 Interactive Analysis"])
+
+# --- TAB 1: SCANNER ---
+df_scan = pd.DataFrame()  
+with tab1:
+    st.subheader("Hasil Pemindaian Pasar Harian")
+    
+    if len(saham_di_scan) == 0:
+        st.warning("Silakan pilih emiten terlebih dahulu pada menu Sidebar.")
+    else:
+        with st.spinner(f"Memindai data teknikal {len(saham_di_scan)} emiten secara paralel..."):
+            df_scan = run_bulk_scanner(saham_di_scan)
+
+        if df_scan is not None and not df_scan.empty:
+            kolom_rapi = ["Ticker", "Price", "Change %", "Volume", "MA20", "MA50", "RSI", "Trend", "Keterangan", "Actionable"]
+            
+            for
