@@ -18,7 +18,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE EMITEN BEI ---
+# --- 3. DATABASE EMITEN BEI RAKSASA (SUDAH TERMASUK AADI, CMRY, MORA, ELPI, DSSA, DLL) ---
 @st.cache_data(ttl=604800)
 def load_all_indonesia_tickers():
     saham_bei = [
@@ -26,42 +26,50 @@ def load_all_indonesia_tickers():
         "BBCA", "BBRI", "BMRI", "BBNI", "BRIS", "BBTN", "BDMN", "BTPN", "BJBR", "BJTM", 
         "AGRO", "BCIC", "BINA", "DNAR", "MAYB", "MEGA", "PNBN", "PNBS", "BVIC", "BBHI", 
         "ARTO", "BBYB", "BYBK", "BNGA", "BNLI", "BSIM", "NISP", "PNLF", "PANS", "ADMF",
+        "BCAP", "BBLD", "BABP", "BACA", "BESS", "CFIN", "DEFI", "GSMF", "MASB", "NOBU",
         
-        # --- TAMBANG, ENERGI & MINERAL ---
-        "ADRO", "PTBA", "ITMG", "HRUM", "INDY", "DOID", "KKGI", "BYAN", "GEMS", "BUMI", 
-        "DEWA", "TOBA", "MEDC", "ENRG", "PGAS", "AKRA", "PGEO", "ANTM", "TINS", "INCO", 
-        "MDKA", "MBMA", "NCKL", "BRMS", "DKFT", "PSAB", "ZINC", "IFSH", "MBAP", "SGER",
+        # --- TAMBANG, ENERGI, MINERAL & SAHAM KELOMPOK DIAN SWASTATIKA ---
+        "AADI", "ADRO", "PTBA", "ITMG", "HRUM", "INDY", "DOID", "KKGI", "BYAN", "GEMS", 
+        "BUMI", "DEWA", "TOBA", "MEDC", "ENRG", "PGAS", "AKRA", "PGEO", "ANTM", "TINS", 
+        "INCO", "MDKA", "MBMA", "NCKL", "BRMS", "DKFT", "PSAB", "ZINC", "IFSH", "MBAP", 
+        "SGER", "DSSA", "ELPI", "APEX", "ARTI", "BIPI", "BOSS", "BESS", "CTTH", "CUAN",
+        "D限制", "GREN", "IATA", "MDVS", "MITI", "PKPK", "RMKO", "RMKE", "SURE", "WOWS",
         
-        # --- INFRASTRUKTUR, TELEKOMUNIKASI & LOGISTIK ---
-        "TLKM", "EXCL", "ISAT", "FREN", "TOWR", "TBIG", "CENT", "JSMR", "BIRD", "SMDR", 
-        "TMAS", "ASSA", "META", "CMNP", "POWR", "KEEN", "ARKO", "WEGE", "WIKA", "PTPP", 
-        "ADHI", "TOTL", "ACST", "BPII", "BLTA", "GIAA", "NELY", "HAIS", "IPCM",
+        # --- INFRASTRUKTUR, TELEKOMUNIKASI, LOGISTIK & MENARA ---
+        "MORA", "TLKM", "EXCL", "ISAT", "FREN", "TOWR", "TBIG", "CENT", "JSMR", "BIRD", 
+        "SMDR", "TMAS", "ASSA", "META", "CMNP", "POWR", "KEEN", "ARKO", "WEGE", "WIKA", 
+        "PTPP", "ADHI", "TOTL", "ACST", "BPII", "BLTA", "GIAA", "NELY", "HAIS", "IPCM",
+        "BALI", "BUKK", "CASS", "GHON", "GIPH", "HITS", "IBST", "JAST", "LINK", "PORT",
         
-        # --- BARANG KONSUMEN PRIMER ---
-        "INDF", "ICBP", "UNVR", "MYOR", "GGRM", "HMSP", "WIIM", "AALI", "LSIP", "SIMP", 
-        "BWPT", "TAPG", "DSNG", "SSMS", "CLEO", "CAMP", "ROTI", "GOOD", "PSSI", 
-        "STAA", "TBLA", "SGRO", "SMAR", "CPRO", "JPFA", "CPIN", "MAIN", "WMUU",
+        # --- BARANG KONSUMEN PRIMER (Makanan, Rokok, Susu & Kebun) ---
+        "CMRY", "INDF", "ICBP", "UNVR", "MYOR", "GGRM", "HMSP", "WIIM", "AALI", "LSIP", 
+        "SIMP", "BWPT", "TAPG", "DSNG", "SSMS", "CLEO", "CAMP", "ROTI", "GOOD", "PSSI", 
+        "STAA", "TBLA", "SGRO", "SMAR", "CPRO", "JPFA", "CPIN", "MAIN", "WMUU", "AISA",
+        "ALTO", "BISI", "BTEK", "BUDI", "CEKA", "DLTA", "FOOD", "IKAN", "KEJU", "PANI",
         
-        # --- BARANG KONSUMEN NON-PRIMER ---
+        # --- BARANG KONSUMEN NON-PRIMER (Ritel, Media, Otomotif, Mainan) ---
         "ASII", "ACES", "MAPI", "MAPA", "ERAA", "RALS", "AMRT", "MEDI", "MNCN", "SCMA", 
-        "EMTK", "LINK", "NETV", "AUTO", "DRMA", "SMSM", "GJTL", "MASA", "IMAS", "LPPF", 
-        "PMMP", "PANR", "BUVA", "MDIA", "FORU", "ALTO",
+        "EMTK", "NETV", "AUTO", "DRMA", "SMSM", "GJTL", "MASA", "IMAS", "LPPF", "CBDK",
+        "PMMP", "PANR", "BUVA", "MDIA", "FORU", "AGAR", "AMMS", "BABY", "BELI", "BIPN", 
+        "CARS", "EPAC", "FILM", "GLOB", "HOME", "HOTL", "IKBI", "KBLA", "LPIN", "MSIN",
         
         # --- KESEHATAN & FARMASI ---
         "KLBF", "MIKA", "HEAL", "SILO", "SAME", "PRDA", "TSPC", "KAEF", "INAF", "PEHA", 
-        "BMHS", "IRRA", "OMED", "SIDO",
+        "BMHS", "IRRA", "OMED", "SIDO", "ASTA", "CARE", "DGNS", "MREI", "PRIM", "SOCI",
         
         # --- PROPERTI & REAL ESTATE ---
         "BSDE", "PWON", "CTRA", "SMRA", "ASRI", "DUTI", "DILD", "PPRO", "LPCK", "LPKR", 
         "MDLN", "BKSL", "KIJA", "BEST", "SSIA", "AMAN", "BAPA", "FMII", "GAMA", "JRPT",
+        "ADMG", "AMOR", "APLN", "BIPP", "COCO", "CPRI", "DMAS", "EMDE", "GAMA", "GURA",
         
         # --- TEKNOLOGI & DIGITAL EKONOMI ---
-        "GOTO", "BUKA", "BELI", "WIFI", "ATIC", "HDIT", "MLPT", "MCAS", "DIVA", 
-        "ASPI", "GLVA", "ZYRX",
+        "GOTO", "BUKA", "WIFI", "ATIC", "HDIT", "MLPT", "MCAS", "DIVA", "ASPI", "GLVA", 
+        "ZYRX", "AWAN", "BTEL", "CHIP", "CYBR", "DNAR", "KREN", "LUCK", "PTMP", "SKYB",
         
         # --- PERINDUSTRIAN, KIMIA & MATERIAL DASAR ---
-        "AMMN", "SMGR", "INTP", "BRPT", "TPIA", "INKP", "TKIM", 
-        "ANJT", "LTLS", "UNIC", "AGII", "ESSA", "TOTO", "AVIA", "MARK", "ALKA"
+        "AMMN", "SMGR", "INTP", "BRPT", "TPIA", "INKP", "TKIM", "ANJT", "LTLS", "UNIC", 
+        "AGII", "ESSA", "TOTO", "AVIA", "MARK", "ALKA", "AKPI", "ALMI", "BAJA", "BRAM", 
+        "BRNA", "GDST", "IGAR", "IMPC", "INAI", "INCI", "KRAS", "LION", "LMSH", "NIKL"
     ]
     
     cleaned_list = []
@@ -76,22 +84,14 @@ def load_all_indonesia_tickers():
 master_tickers_jk = load_all_indonesia_tickers()
 master_tickers_clean = [t.replace(".JK", "") for t in master_tickers_jk]
 
-# --- 4. DATA CLEANING UTILITY (Rombak Total untuk Proteksi Kolom Tunggal) ---
+# --- 4. DATA CLEANING UTILITY ---
 def clean_yf_dataframe(df):
     if df is None or df.empty:
         return None
-    
-    # Ratakan struktur MultiIndex jika dideteksi dari yfinance
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
-        
-    # Salin data untuk menghindari penulisan pada slice dataframe asli
     df = df.copy()
-    
-    # Paksa nama kolom menjadi string bersih tunggal tanpa spasi samping
     df.columns = [str(col).strip() for col in df.columns]
-    
-    # Reset index jika index berupa tanggal agar penataan manipulasi baris aman
     df.index = pd.to_datetime(df.index)
     return df
 
@@ -181,9 +181,9 @@ with st.sidebar:
     )
     
     if pilihan_mode == "Saham Pilihan Utama (LQ45/Bluechip)":
-        saham_di_scan = ["BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "GOTO", "UNVR", "ADRO", "PTBA", "BRIS", "ANTM", "INDF", "ICBP", "KLBF", "AMMN", "MDKA", "SIDO"]
+        saham_di_scan = ["BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "GOTO", "UNVR", "ADRO", "PTBA", "BRIS", "ANTM", "INDF", "ICBP", "KLBF", "AMMN", "MDKA", "SIDO", "AADI", "CMRY"]
     elif pilihan_mode == "Kustom Pilih Sendiri (Multi-Select)":
-        saham_di_scan = st.multiselect("Ketik & Pilih Kode Saham:", options=master_tickers_clean, default=["BBCA", "BBRI", "BMRI"])
+        saham_di_scan = st.multiselect("Ketik & Pilih Kode Saham:", options=master_tickers_clean, default=["BBCA", "BBRI", "AADI", "CMRY", "DSSA"])
     else:
         abjad = st.radio("Pilih Huruf Depan:", ["A-D", "E-J", "K-P", "Q-T", "U-Z"])
         saham_di_scan = [t for t in master_tickers_clean if t in abjad.replace("-", "")]
@@ -249,7 +249,6 @@ with tab3:
     
     if df_stock is not None and not df_stock.empty and len(df_stock) >= 2 and 'Close' in df_stock.columns:
         try:
-            # Memastikan pengambilan data harga dikonversi ke tipe data float murni tunggal
             c_price = float(df_stock['Close'].iloc[-1])
             p_price = float(df_stock['Close'].iloc[-2])
             
@@ -268,7 +267,6 @@ with tab3:
                 delta_ma = "Di atas MA50 (Bullish)" if c_price > ma50_val else "Di bawah MA50 (Bearish)"
                 st.metric(label="Posisi MA50", value=f"Rp {ma50_val:,.0f}", delta=delta_ma)
             
-            # Konversi kolom ke series satu dimensi eksplisit untuk menjamin keamanan rendering plotly
             fig = go.Figure()
             fig.add_trace(go.Candlestick(
                 x=df_stock.index,
