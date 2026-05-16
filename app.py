@@ -192,11 +192,25 @@ with tab3:
                 # Komponen Candlestick utama
                 fig.add_trace(go.Candlestick(
                     x=df_stock.index,
-                    open=df_stock['Open'], high=df_stock['High'],
-                    low=df_stock['Low'], close=df_stock['Close'],
+                    open=df_stock['Open'], 
+                    high=df_stock['High'],
+                    low=df_stock['Low'], 
+                    close=df_stock['Close'],
                     name="Harga Saham"
                 ))
                 
-                # Komponen Garis Moving Average overlay
+                # Komponen Garis Moving Average overlay (Sudah diperbaiki kurungnya agar tidak terpotong)
                 fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA20'], line=dict(color='orange', width=1.5), name="MA 20"))
-                fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA50'], line=dict(color='blue',
+                fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA50'], line=dict(color='blue', width=1.5), name="MA 50"))
+                
+                fig.update_layout(
+                    title=f"Grafik Historis {selected_stock} (1 Tahun Terakhir)",
+                    xaxis_title="Tanggal",
+                    yaxis_title="Harga (IDR)",
+                    xaxis_rangeslider_visible=False,
+                    template="plotly_white",
+                    height=500,
+                    hovermode="x unified"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
