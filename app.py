@@ -158,57 +158,72 @@ with tab3:
     ticker_jk = f"{selected_stock}.JK"
     df_stock = get_single_stock_data(ticker_jk)
     
-    if df_stock is not None:
-        # 1. Tampilkan Ringkasan Menggunakan st.metric
-        last_row = df_stock.iloc[-1]
-        prev_row = df_stock.iloc[-2]
-        
-        c_price = float(last_row['Close'])
-        p_price = float(prev_row['Close'])
-        diff = c_price - p_price
-        pct = (diff / p_price) * 100
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric(label="Harga Terakhir", value=f"Rp {c_price:,.0f}", delta=f"{diff:+.0f} ({pct:+.2f}%)")
-        with col2:
-            st.metric(label="RSI (14)", value=f"{last_row['RSI']:.2f}", 
-                      delta="Oversold (<35)" if last_row['RSI'] < 35 else ("Overbought (>70)" if last_row['RSI'] > 70 else "Neutral"))
-        with col3:
-            st.metric(label="Posisi MA50", value=f"Rp {last_row['MA50']:,.0f}", 
-                      delta="Di atas MA50 (Bullish)" if c_price > last_row['MA50'] else "Di bawah MA50 (Bearish)")
-        
-        # 2. Buat Grafik Candlestick Interaktif dengan Plotly
-        fig = go.Figure()
-        
-        # Candlestick
-        fig.add_trace(go.Candlestick(
-            x=df_stock.index,
-            open=df_stock['Open'], high=df_stock['High'],
-            low=df_stock['Low'], close=df_stock['Close'],
-            name="Harga Saham"
-        ))
-        
-        # Garis Moving Average 20 & 50
-        fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA20'], line=dict(color='orange', width=1.5), name="MA 20"))
-        fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA50'], line=dict(color='blue', width=1.5), name="MA 50"))
-        
-        # Atur Tampilan Grafik agar responsif dan bersih
-        fig.update_layout(
-            title=f"Grafik Historis {selected_stock} (1 Tahun Terakhir)",
-            xaxis_title="Tanggal",
-            yaxis_title="Harga (IDR)",
-            xaxis_rangeslider_visible=False, # Matikan range slider bawah agar tidak sempit
-            template="plotly_white",
-            height=500,
-            hovermode="x unified"
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
+    # PENGAMAN UTAMA: Pastikan df_stock tidak None, tidak kosong, dan punya data yang cukup
+    if df_stock is not None and not df_stock.empty and len(df_stock) >= 2:
+        try:
+            # Mengambil baris terakhir dan sebelum terakhir dengan aman
+            last_row = df_stock.iloc[-1]
+            prev_row = df_stock.iloc[-2]
+            
+            # Pengaman tambahan: pastikan kolom 'Close' ada nilainya dan tidak NaN
+            if pd.notna(last_row['Close']) and pd.notna(prev_row['Close']):
+                # Menggunakan item() atau mengambil nilai skalar secara aman dari pandas Series
+                c_price = float(last_row['Close'].values) if hasattr(last_row['Close'], 'values') else float(last_row['Close'])
+                p_price = float(prev_row['Close'].values) if hasattr(prev_row['Close'], 'values') else float(prev_row['Close'])
+                
+                diff = c_price - p_price
+                pct = (diff / p_price) * 100
+                
+                # Mengambil nilai RSI dan MA50 secara aman
+                rsi_val = float(last_row['RSI'].values) if hasattr(last_row['RSI'], 'values') else float(last_row['RSI'])
+                ma50_val = float(last_row['MA50'].values) if hasattr(last_row['MA50'], 'values') else float(last_row['MA50'])
+                ma20_val = float(last_row['MA20'].values) if hasattr(last_row['MA20'], 'values') else float(last_row['MA20'])
+                
+                # 1. Tampilkan Ringkasan Menggunakan st.metric
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric(label="Harga Terakhir", value=f"Rp {c_price:,.0f}", delta=f"{diff:+.0f} ({pct:+.2f}%)")
+                with col2:
+                    delta_rsi = "Oversold (<35)" if rsi_val < 35 else ("Overbought (>70)" if rsi_val > 70 else "Neutral")
+                    st.metric(label="RSI (14)", value=f"{rsi_val:.2f}", delta=delta_rsi)
+                with col3:
+                    delta_ma = "Di atas MA50 (Bullish)" if c_price > ma50_val else "Di bawah MA50 (Bearish)"
+                    st.metric(label="Posisi MA50", value=f"Rp {ma50_val:,.0f}", delta=delta_ma)
+                
+                # 2. Buat Grafik Candlestick Interaktif dengan Plotly
+                fig = go.Figure()
+                
+                # Candlestick
+                fig.add_trace(go.Candlestick(
+                    x=df_stock.index,
+                    open=df_stock['Open'], high=df_stock['High'],
+                    low=df_stock['Low'], close=df_stock['Close'],
+                    name="Harga Saham"
+                ))
+                
+                # Garis Moving Average 20 & 50
+                fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA20'], line=dict(color='orange', width=1.5), name="MA 20"))
+                fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA50'], line=dict(color='blue', width=1.5), name="MA 50"))
+                
+                # Atur Tampilan Grafik
+                fig.update_layout(
+                    title=f"Grafik Historis {selected_stock} (1 Tahun Terakhir)",
+                    xaxis_title="Tanggal",
+                    yaxis_title="Harga (IDR)",
+                    xaxis_rangeslider_visible=False,
+                    template="plotly_white",
+                    height=500,
+                    hovermode="x unified"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning(f"Data harga terbaru untuk {selected_stock} tidak lengkap atau kosong di Yahoo Finance.")
+                
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat memproses data grafik: {str(e)}")
     else:
-        st.error(f"Gagal memuat grafik untuk {selected_stock}. Pastikan kode emiten benar.")
-
+        st.warning(f"⚠️ Gagal memuat data untuk {selected_stock}. Yahoo Finance kemungkinan membatasi request Anda atau emiten sedang disuspensi. Silakan coba pilih kode saham lain di sidebar.")
 # --- FOOTER ---
 st.markdown("---")
 st.markdown(f"© {datetime.now().year} **SwingScanner Pro** | Menggunakan Streamlit Modern | Data Source: Yahoo Finance")
