@@ -9,7 +9,7 @@ import concurrent.futures
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Swing Trading Scanner BEI", layout="wide", page_icon="📈")
 
-# --- 2. CUSTOM CSS (Tampilan Bersih & Profesional) ---
+# --- 2. CUSTOM CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FAFAFA; }
@@ -18,8 +18,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE SELURUH EMITEN AKTIF INDONESIA (HARDCODED) ---
-@st.cache_data(ttl=604800) # Disimpan dalam cache selama 1 minggu agar loading instant
+# --- 3. DATABASE EMITEN BEI ---
+@st.cache_data(ttl=604800)
 def load_all_indonesia_tickers():
     saham_bei = [
         # --- PERBANKAN & KEUANGAN ---
@@ -37,15 +37,15 @@ def load_all_indonesia_tickers():
         "TMAS", "ASSA", "META", "CMNP", "POWR", "KEEN", "ARKO", "WEGE", "WIKA", "PTPP", 
         "ADHI", "TOTL", "ACST", "BPII", "BLTA", "GIAA", "NELY", "HAIS", "IPCM",
         
-        # --- BARANG KONSUMEN PRIMER (Makanan, Rokok, Kebun) ---
+        # --- BARANG KONSUMEN PRIMER ---
         "INDF", "ICBP", "UNVR", "MYOR", "GGRM", "HMSP", "WIIM", "AALI", "LSIP", "SIMP", 
-        "BWPT", "TAPG", "DSNG", "SSMS", "ANDI", "CLEO", "CAMP", "ROTI", "GOOD", "PSSI", 
+        "BWPT", "TAPG", "DSNG", "SSMS", "CLEO", "CAMP", "ROTI", "GOOD", "PSSI", 
         "STAA", "TBLA", "SGRO", "SMAR", "CPRO", "JPFA", "CPIN", "MAIN", "WMUU",
         
-        # --- BARANG KONSUMEN NON-PRIMER (Ritel, Media, Otomotif) ---
-        "ASII", "ACES", "MAPI", "MAPA", "ERA", "RALS", "AMRT", "MEDI", "MNCN", "SCMA", 
-        "EMTKM", "LINK", "NETV", "AUTO", "DRMA", "SMSM", "GJTL", "MASA", "IMAS", "LPPF", 
-        "PMMP", "PANR", "BUVA", "MDIA", "V擴O", "FORU", "ALTO",
+        # --- BARANG KONSUMEN NON-PRIMER ---
+        "ASII", "ACES", "MAPI", "MAPA", "ERAA", "RALS", "AMRT", "MEDI", "MNCN", "SCMA", 
+        "EMTK", "LINK", "NETV", "AUTO", "DRMA", "SMSM", "GJTL", "MASA", "IMAS", "LPPF", 
+        "PMMP", "PANR", "BUVA", "MDIA", "FORU", "ALTO",
         
         # --- KESEHATAN & FARMASI ---
         "KLBF", "MIKA", "HEAL", "SILO", "SAME", "PRDA", "TSPC", "KAEF", "INAF", "PEHA", 
@@ -56,11 +56,11 @@ def load_all_indonesia_tickers():
         "MDLN", "BKSL", "KIJA", "BEST", "SSIA", "AMAN", "BAPA", "FMII", "GAMA", "JRPT",
         
         # --- TEKNOLOGI & DIGITAL EKONOMI ---
-        "GOTO", "BUKA", "BELI", "WIFI", "ATIC", "HDIT", "MLPT", "MCAS", "DIVA", "KREN", 
+        "GOTO", "BUKA", "BELI", "WIFI", "ATIC", "HDIT", "MLPT", "MCAS", "DIVA", 
         "ASPI", "GLVA", "ZYRX",
         
         # --- PERINDUSTRIAN, KIMIA & MATERIAL DASAR ---
-        "AMMN", "JPFA", "MAIN", "SMGR", "INTP", "SMCB", "BRPT", "TPIA", "INKP", "TKIM", 
+        "AMMN", "SMGR", "INTP", "BRPT", "TPIA", "INKP", "TKIM", 
         "ANJT", "LTLS", "UNIC", "AGII", "ESSA", "TOTO", "AVIA", "MARK", "ALKA"
     ]
     
@@ -85,7 +85,7 @@ def clean_yf_dataframe(df):
     df.index = pd.to_datetime(df.index)
     return df
 
-# --- 5. SATUAN FUNGSI SCANNING PER SAHAM (UNTUK PARALEL/MULTI-THREADING) ---
+# --- 5. DETEKSI INDIVIDUAL STOCK ---
 def fetch_and_analyze_stock(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
@@ -130,11 +130,10 @@ def fetch_and_analyze_stock(ticker):
     except:
         return None
 
-# --- 6. CORE BULK SCANNER DENGAN MULTI-THREADING ---
-@st.cache_data(ttl=900) 
+# --- 6. CORE BULK SCANNER ---
+@st.cache_data(ttl=600) 
 def run_bulk_scanner(ticker_list):
     results = []
-    # Menggunakan max_workers=15 agar loading cepat namun terhindar dari IP Banned oleh Yahoo Finance
     with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
         future_to_ticker = {executor.submit(fetch_and_analyze_stock, t): t for t in ticker_list}
         for future in concurrent.futures.as_completed(future_to_ticker):
@@ -143,8 +142,8 @@ def run_bulk_scanner(ticker_list):
                 results.append(res)
     return pd.DataFrame(results)
 
-# --- 7. GRAPH FETCHING (SINGLE STOCK DETAIL ANALYSIS) ---
-@st.cache_data(ttl=300)
+# --- 7. SINGLE STOCK FETCH ---
+@st.cache_data(ttl=120)
 def get_single_stock_data(ticker):
     try:
         df = yf.download(ticker, period="1y", interval="1d", progress=False)
@@ -158,7 +157,7 @@ def get_single_stock_data(ticker):
     except:
         return None
 
-# --- 8. TAMPILAN UTAMA & NAVIGATION ---
+# --- 8. TAMPILAN UTAMA ---
 st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard (Seluruh Saham BEI)</h1>", unsafe_allow_html=True)
 
 # --- 9. SIDEBAR CONTROL PANEL ---
@@ -180,4 +179,4 @@ with st.sidebar:
             default=["BBCA", "BBRI", "BMRI", "BBNI", "TLKM"]
         )
     else:
-        kelompok_abjad = st.selectbox("Pilih Urutan Abjad
+        kelompok_abjad = st.selectbox("Pilih Urutan Abjad Emiten:",
