@@ -18,7 +18,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE EMITEN BEI RAKSASA (SUDAH TERMASUK AADI, CMRY, MORA, ELPI, DSSA, DLL) ---
+# --- 3. DATABASE EMITEN BEI RAKSASA ---
 @st.cache_data(ttl=604800)
 def load_all_indonesia_tickers():
     saham_bei = [
@@ -28,26 +28,26 @@ def load_all_indonesia_tickers():
         "ARTO", "BBYB", "BYBK", "BNGA", "BNLI", "BSIM", "NISP", "PNLF", "PANS", "ADMF",
         "BCAP", "BBLD", "BABP", "BACA", "BESS", "CFIN", "DEFI", "GSMF", "MASB", "NOBU",
         
-        # --- TAMBANG, ENERGI, MINERAL & SAHAM KELOMPOK DIAN SWASTATIKA ---
+        # --- TAMBANG, ENERGI & MINERAL ---
         "AADI", "ADRO", "PTBA", "ITMG", "HRUM", "INDY", "DOID", "KKGI", "BYAN", "GEMS", 
         "BUMI", "DEWA", "TOBA", "MEDC", "ENRG", "PGAS", "AKRA", "PGEO", "ANTM", "TINS", 
         "INCO", "MDKA", "MBMA", "NCKL", "BRMS", "DKFT", "PSAB", "ZINC", "IFSH", "MBAP", 
         "SGER", "DSSA", "ELPI", "APEX", "ARTI", "BIPI", "BOSS", "BESS", "CTTH", "CUAN",
-        "D限制", "GREN", "IATA", "MDVS", "MITI", "PKPK", "RMKO", "RMKE", "SURE", "WOWS",
+        "GREN", "IATA", "MDVS", "MITI", "PKPK", "RMKO", "RMKE", "SURE", "WOWS",
         
-        # --- INFRASTRUKTUR, TELEKOMUNIKASI, LOGISTIK & MENARA ---
+        # --- INFRASTRUKTUR, TELEKOMUNIKASI & LOGISTIK ---
         "MORA", "TLKM", "EXCL", "ISAT", "FREN", "TOWR", "TBIG", "CENT", "JSMR", "BIRD", 
         "SMDR", "TMAS", "ASSA", "META", "CMNP", "POWR", "KEEN", "ARKO", "WEGE", "WIKA", 
         "PTPP", "ADHI", "TOTL", "ACST", "BPII", "BLTA", "GIAA", "NELY", "HAIS", "IPCM",
         "BALI", "BUKK", "CASS", "GHON", "GIPH", "HITS", "IBST", "JAST", "LINK", "PORT",
         
-        # --- BARANG KONSUMEN PRIMER (Makanan, Rokok, Susu & Kebun) ---
+        # --- BARANG KONSUMEN PRIMER ---
         "CMRY", "INDF", "ICBP", "UNVR", "MYOR", "GGRM", "HMSP", "WIIM", "AALI", "LSIP", 
         "SIMP", "BWPT", "TAPG", "DSNG", "SSMS", "CLEO", "CAMP", "ROTI", "GOOD", "PSSI", 
         "STAA", "TBLA", "SGRO", "SMAR", "CPRO", "JPFA", "CPIN", "MAIN", "WMUU", "AISA",
         "ALTO", "BISI", "BTEK", "BUDI", "CEKA", "DLTA", "FOOD", "IKAN", "KEJU", "PANI",
         
-        # --- BARANG KONSUMEN NON-PRIMER (Ritel, Media, Otomotif, Mainan) ---
+        # --- BARANG KONSUMEN NON-PRIMER ---
         "ASII", "ACES", "MAPI", "MAPA", "ERAA", "RALS", "AMRT", "MEDI", "MNCN", "SCMA", 
         "EMTK", "NETV", "AUTO", "DRMA", "SMSM", "GJTL", "MASA", "IMAS", "LPPF", "CBDK",
         "PMMP", "PANR", "BUVA", "MDIA", "FORU", "AGAR", "AMMS", "BABY", "BELI", "BIPN", 
@@ -59,12 +59,12 @@ def load_all_indonesia_tickers():
         
         # --- PROPERTI & REAL ESTATE ---
         "BSDE", "PWON", "CTRA", "SMRA", "ASRI", "DUTI", "DILD", "PPRO", "LPCK", "LPKR", 
-        "MDLN", "BKSL", "KIJA", "BEST", "SSIA", "AMAN", "BAPA", "FMII", "GAMA", "JRPT",
-        "ADMG", "AMOR", "APLN", "BIPP", "COCO", "CPRI", "DMAS", "EMDE", "GAMA", "GURA",
+        "MDLN", "BKSL", "KIJA", "BEST", "SSIA", "AMAN", "BAPA", "FMII", "JRPT",
+        "ADMG", "AMOR", "APLN", "BIPP", "COCO", "CPRI", "DMAS", "EMDE", "GURA",
         
         # --- TEKNOLOGI & DIGITAL EKONOMI ---
         "GOTO", "BUKA", "WIFI", "ATIC", "HDIT", "MLPT", "MCAS", "DIVA", "ASPI", "GLVA", 
-        "ZYRX", "AWAN", "BTEL", "CHIP", "CYBR", "DNAR", "KREN", "LUCK", "PTMP", "SKYB",
+        "ZYRX", "AWAN", "BTEL", "CHIP", "CYBR", "KREN", "LUCK", "PTMP", "SKYB",
         
         # --- PERINDUSTRIAN, KIMIA & MATERIAL DASAR ---
         "AMMN", "SMGR", "INTP", "BRPT", "TPIA", "INKP", "TKIM", "ANJT", "LTLS", "UNIC", 
@@ -95,7 +95,7 @@ def clean_yf_dataframe(df):
     df.index = pd.to_datetime(df.index)
     return df
 
-# --- 5. DETEKSI INDIVIDUAL STOCK ---
+# --- 5. DETEKSI INDIVIDUAL STOCK (DIPERLENGKAP UNTUK DATA TABEL BARU) ---
 def fetch_and_analyze_stock(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
@@ -112,6 +112,7 @@ def fetch_and_analyze_stock(ticker):
         last_price = float(df['Close'].iloc[-1])
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
+        last_volume = float(df['Volume'].iloc[-1]) if 'Volume' in df.columns else 0.0
         
         last_rsi = float(df['RSI'].iloc[-1])
         last_ma20 = float(df['MA20'].iloc[-1])
@@ -120,6 +121,16 @@ def fetch_and_analyze_stock(ticker):
         
         trend = "Up-Trend" if last_price > last_ma50 else "Down-Trend"
         
+        # Membuat Keterangan Posisi MA yang Informatif
+        if last_price > last_ma20 and last_price > last_ma50:
+            keterangan = "Diatas MA20 & MA50 (Strong)"
+        elif last_price > last_ma20:
+            keterangan = "Diatas MA20"
+        elif last_price > last_ma50:
+            keterangan = "Diatas MA50"
+        else:
+            keterangan = "Dibawah MA Harian"
+            
         if last_rsi < 35:
             action = "BUY (Oversold)"
         elif last_price > last_ma20 and prev_price <= prev_ma20_val:
@@ -133,8 +144,12 @@ def fetch_and_analyze_stock(ticker):
             "Ticker": ticker.replace(".JK", ""),
             "Price": last_price,
             "Change %": round(change_pct, 2),
+            "Volume": last_volume,
+            "MA20": round(last_ma20, 2) if not pd.isna(last_ma20) else 0.0,
+            "MA50": round(last_ma50, 2) if not pd.isna(last_ma50) else 0.0,
             "RSI": round(last_rsi, 2),
             "Trend": trend,
+            "Keterangan": keterangan,
             "Actionable": action
         }
     except:
@@ -198,7 +213,7 @@ with st.sidebar:
 # --- 10. TABS LAYOUT ---
 tab1, tab2, tab3 = st.tabs(["🔍 Actionable Scanner", "🔥 Market Heatmap", "📊 Interactive Analysis"])
 
-# --- TAB 1: SCANNER ---
+# --- TAB 1: SCANNER (TABEL BARU LEBIH LENGKAP) ---
 df_scan = pd.DataFrame()  
 with tab1:
     st.subheader("Hasil Pemindaian Pasar Harian")
@@ -210,18 +225,30 @@ with tab1:
             df_scan = run_bulk_scanner(saham_di_scan)
 
         if df_scan is not None and not df_scan.empty:
+            # Mengatur urutan kolom tabel agar persis rapi sesuai kebutuhan analisis komprehensif
+            kolom_rapi = ["Ticker", "Price", "Change %", "Volume", "MA20", "MA50", "RSI", "Trend", "Keterangan", "Actionable"]
+            df_display = df_scan[kolom_rapi] if all(col in df_scan.columns for col in kolom_rapi) else df_scan
+
             def color_rows(val):
                 val_str = str(val)
                 if "BUY" in val_str: return 'background-color: #d4edda; color: #155724; font-weight: bold;'
                 if "SELL" in val_str: return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
                 if "Up-Trend" in val_str: return 'color: #28a745; font-weight: bold;'
                 if "Down-Trend" in val_str: return 'color: #dc3545; font-weight: bold;'
+                if "Strong" in val_str: return 'color: #0056b3; font-weight: bold;'
                 return ''
 
-            styled_df = df_scan.style.map(color_rows, subset=['Actionable', 'Trend'])\
-                                     .format({"Price": "Rp {:,.0f}", "Change %": "{:+.2f}%", "RSI": "{:.2f}"})
+            styled_df = df_display.style.map(color_rows, subset=['Actionable', 'Trend', 'Keterangan'])\
+                                     .format({
+                                         "Price": "Rp {:,.0f}", 
+                                         "Change %": "{:+.2f}%", 
+                                         "Volume": "{:,.0f}",
+                                         "MA20": "Rp {:,.1f}",
+                                         "MA50": "Rp {:,.1f}",
+                                         "RSI": "{:.2f}"
+                                     })
             
-            st.dataframe(styled_df, use_container_width=True, height=500)
+            st.dataframe(styled_df, use_container_width=True, height=550)
         else:
             st.error("Gagal mendapatkan data scanner. Coba pilih kelompok emiten yang berbeda.")
 
