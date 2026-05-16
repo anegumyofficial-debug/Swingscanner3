@@ -238,4 +238,83 @@ with tab1:
         if df_scan is not None and not df_scan.empty:
             kolom_rapi = ["Ticker", "Price", "Change %", "Volume", "MA20", "MA50", "RSI", "Trend", "Keterangan", "Actionable"]
             
-            for
+            for col in kolom_rapi:
+                if col not in df_scan.columns:
+                    df_scan[col] = 0.0 if col in ["Price", "Change %", "Volume", "MA20", "MA50", "RSI"] else "-"
+                    
+            df_display = df_scan[kolom_rapi].copy()
+
+            def color_scanner_rows(row):
+                styles = [''] * len(row)
+                act_val = str(row['Actionable'])
+                trend_val = str(row['Trend'])
+                ket_val = str(row['Keterangan'])
+                
+                idx_act = row.index.get_loc('Actionable')
+                idx_trend = row.index.get_loc('Trend')
+                idx_ket = row.index.get_loc('Keterangan')
+                
+                if "BUY" in act_val:
+                    styles[idx_act] = 'background-color: #d4edda; color: #155724; font-weight: bold;'
+                elif "SELL" in act_val:
+                    styles[idx_act] = 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
+                
+                if "Up-Trend" in trend_val:
+                    styles[idx_trend] = 'color: #28a745; font-weight: bold;'
+                elif "Down-Trend" in trend_val:
+                    styles[idx_trend] = 'color: #dc3545; font-weight: bold;'
+                    
+                if "Strong" in ket_val:
+                    styles[idx_ket] = 'color: #0056b3; font-weight: bold;'
+                    
+                return styles
+
+            styled_df = df_display.style.apply(color_scanner_rows, axis=1)\
+                                     .format({
+                                         "Price": "Rp {:,.0f}", 
+                                         "Change %": "{:+.2f}%", 
+                                         "Volume": "{:,.0f}",
+                                         "MA20": "Rp {:,.1f}",
+                                         "MA50": "Rp {:,.1f}",
+                                         "RSI": "{:.2f}"
+                                     })
+            
+            st.dataframe(styled_df, use_container_width=True, height=550)
+        else:
+            st.error("Gagal mendapatkan data scanner. Coba pilih kelompok emiten yang berbeda.")
+
+# --- TAB 2: MARKET OVERVIEW ---
+with tab2:
+    st.subheader("Market Performance Overview")
+    if df_scan is not None and not df_scan.empty:
+        df_chart = df_scan.sort_values(by="Change %", ascending=False).head(40)
+        fig_bar = go.Figure(go.Bar(
+            x=df_chart['Ticker'],
+            y=df_chart['Change %'],
+            marker_color=['#28a745' if change > 0 else '#dc3545' for change in df_chart['Change %']]
+        ))
+        fig_bar.update_layout(
+            title="Perubahan Harga Saham (%) Hari Ini (Maks. 40 Emiten)", 
+            yaxis_title="Persentase Perubahan", 
+            template="plotly_white"
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+    else:
+        st.warning("Data visualisasi belum tersedia. Jalankan scanner di Tab 1 terlebih dahulu.")
+
+# --- TAB 3: INTERACTIVE ANALYSIS ---
+with tab3:
+    st.subheader(f"Analisis Teknikal Mendalam: {selected_stock}")
+    
+    ticker_jk = f"{selected_stock}.JK"
+    df_stock = get_single_stock_data(ticker_jk)
+    
+    if df_stock is not None and not df_stock.empty and len(df_stock) >= 2 and 'Close' in df_stock.columns and 'Open' in df_stock.columns:
+        try:
+            c_price = float(df_stock['Close'].iloc[-1])
+            p_price = float(df_stock['Close'].iloc[-2])
+            
+            diff = c_price - p_price
+            pct = (diff / p_price) * 100 if p_price != 0 else 0.0
+            
+            raw_rsi_
