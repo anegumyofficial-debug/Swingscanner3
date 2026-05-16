@@ -106,13 +106,14 @@ def fetch_and_analyze_stock(ticker):
         last_rsi = float(df['RSI'].iloc[-1])
         last_ma20 = float(df['MA20'].iloc[-1])
         last_ma50 = float(df['MA50'].iloc[-1])
-        prev_ma20 = float(df['MA20'].iloc[-2])
+        prev_price_val = float(df['Close'].iloc[-2])
+        prev_ma20_val = float(df['MA20'].iloc[-2])
         
         trend = "Up-Trend" if last_price > last_ma50 else "Down-Trend"
         
         if last_rsi < 35:
             action = "BUY (Oversold)"
-        elif last_price > last_ma20 and prev_price <= prev_ma20:
+        elif last_price > last_ma20 and prev_price_val <= prev_ma20_val:
             action = "BUY (MA Cross)"
         elif last_rsi > 70:
             action = "SELL (Overbought)"
@@ -163,20 +164,12 @@ st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard (Seluruh Saham 
 # --- 9. SIDEBAR CONTROL PANEL ---
 with st.sidebar:
     st.header("⚙️ Control Panel")
-    
     st.subheader("🌐 Saring Kelompok Scanner")
+    
     pilihan_mode = st.radio(
         "Pilih Cakupan Emiten:", 
         ["Saham Pilihan Utama (LQ45/Bluechip)", "Kustom Pilih Sendiri (Multi-Select)", "Scan Berdasarkan Kelompok Abjad"]
     )
     
-    if pilihan_mode == "Saham Pilihan Utama (LQ45/Bluechip)":
-        saham_di_scan = ["BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "GOTO", "UNVR", "ADRO", "PTBA", "BRIS", "ANTM", "INDF", "ICBP", "KLBF", "AMMN", "MDKA", "SIDO"]
-    elif pilihan_mode == "Kustom Pilih Sendiri (Multi-Select)":
-        saham_di_scan = st.multiselect(
-            "Ketik & Pilih Kode Saham BEI Anda:", 
-            options=master_tickers_clean, 
-            default=["BBCA", "BBRI", "BMRI", "BBNI", "TLKM"]
-        )
-    else:
-        kelompok_abjad = st.selectbox("Pilih Urutan Abjad Emiten:",
+    # Menentukan emiten berdasarkan pilihan dengan penulisan inline yang aman
+    if pilihan_mode == "Sah
