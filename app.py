@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Swing Trading Scanner", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Swing Trading Scanner BEI", layout="wide", page_icon="📈")
 
 # --- 2. CUSTOM CSS (Tampilan Bersih & Profesional) ---
 st.markdown("""
@@ -17,13 +17,40 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. MASTER DATA EMITEN (LQ45 Pasang Dropback Aman) ---
-try:
-    tickers = pd.read_csv('saham_list.csv')['Ticker'].tolist()
-except:
-    tickers = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "UNVR.JK", "ADRO.JK", "PTBA.JK"]
+# --- 3. AUTO-LOAD SELURUH DATA SAHAM INDONESIA ---
+@st.cache_data(ttl=86400) # Simpan cache selama 24 jam agar loading super cepat
+def get_all_indonesia_tickers():
+    try:
+        # Mengambil master data emiten terupdate dari repository publik terpercaya
+        url = "https://raw.githubusercontent.com/hellonoor/saham-indonesia/master/data/saham.csv"
+        df_all = pd.read_csv(url)
+        # Ambil kolom kode saham (biasanya bernama 'code' atau 'Ticker')
+        if 'code' in df_all.columns:
+            raw_list = df_all['code'].tolist()
+        elif 'Ticker' in df_all.columns:
+            raw_list = df_all['Ticker'].tolist()
+        else:
+            raw_list = ["BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "GOTO", "UNVR", "ADRO", "PTBA"]
+        
+        # Bersihkan format teks dan pastikan berakhiran .JK
+        cleaned_list = []
+        for t in raw_list:
+            t_clean = str(t).strip().upper()
+            if not t_clean.endswith(".JK"):
+                t_clean = f"{t_clean}.JK"
+            if len(t_clean) <= 8: # Filter baris sampah/bukan kode saham
+                cleaned_list.append(t_clean)
+        
+        return sorted(list(set(cleaned_list)))
+    except:
+        # Fallback list jika koneksi repositori bermasalah
+        return ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "UNVR.JK", "ADRO.JK", "PTBA.JK", "BRIS.JK", "AMMN.JK", "BYAN.JK", "TPIA.JK"]
 
-# --- 4. FUNGSI UTAS UNTUK MEMBERSIHKAN MULTI-INDEX YAHOO FINANCE ---
+# Load semua data master emiten Indonesia
+master_tickers_jk = get_all_indonesia_tickers()
+master_tickers_clean = [t.replace(".JK", "") for t in master_tickers_jk]
+
+# --- 4. FUNGSI UTAS UNTUK MEMBERSIHKAN MULTI-INDEX ---
 def clean_yf_dataframe(df):
     if df is None or df.empty:
         return None
@@ -97,21 +124,29 @@ def scan_saham(ticker_list):
     return pd.DataFrame(results)
 
 # --- 7. TAMPILAN UTAMA & HEADER ---
-st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard (Seluruh Saham BEI)</h1>", unsafe_allow_html=True)
 
 # --- 8. SIDEBAR CONTROL PANEL ---
 with st.sidebar:
     st.header("⚙️ Control Panel")
-    st.subheader("Analisis Saham Individual")
-    clean_tickers = [t.replace(".JK", "") for t in tickers]
-    selected_stock = st.selectbox("Pilih Saham untuk Grafik:", clean_tickers, index=0)
+    
+    st.subheader("🌐 Saring Kelompok Scanner")
+    # Fitur krusial agar server tidak keberatan me-load 800+ saham sekaligus secara bersamaan
+    pilihan_mode = st.radio("Pilih Kelompok Saham:", ["Saham Pilihan Utama (LQ45/Bluechip)", "Kustom Pilih Sendiri (Multi-Select)"])
+    
+    if pilihan_mode == "Saham Pilihan Utama (LQ45/Bluechip)":
+        saham_di_scan = ["BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "GOTO", "UNVR", "ADRO", "PTBA", "BRIS", "ANTM", "INDF", "ICBP", "KLBF"]
+    else:
+        saham_di_scan = st.multiselect("Masukkan/Ketik Kode Saham BEI yang ingin dipindai:", 
+                                       options=master_tickers_clean, 
+                                       default=["BBCA", "BBRI", "BMRI", "BBNI", "TLKM"])
     
     st.markdown("---")
-    st.subheader("Filter Scanner (Tab 1)")
-    strategi = st.multiselect("Strategi Aktif:", 
-                             ["MA 20 Cross", "RSI Oversold", "RSI Overbought"],
-                             default=["MA 20 Cross", "RSI Oversold"])
-    min_rsi_filter = st.slider("Batas Minimum RSI", 0, 100, 30)
+    st.subheader("Analisis Grafik Individual")
+    selected_stock = st.selectbox("Pilih Saham untuk Grafik Detail (Tab 3):", master_tickers_clean, index=master_tickers_clean.index("BBCA") if "BBCA" in master_tickers_clean else 0)
+    
+    st.markdown("---")
+    st.info(f"Total Database Kompatibel: {len(master_tickers_clean)} Saham Indonesia terdeteksi.")
 
 # --- 9. DEFINISI LAYOUT TABS ---
 tab1, tab2, tab3 = st.tabs(["🔍 Actionable Scanner", "🔥 Market Heatmap", "📊 Interactive Analysis"])
@@ -120,34 +155,34 @@ tab1, tab2, tab3 = st.tabs(["🔍 Actionable Scanner", "🔥 Market Heatmap", "�
 with tab1:
     st.subheader("Hasil Pemindaian Pasar Harian")
     
-    with st.spinner("Memproses data pasar dari Yahoo Finance..."):
-        df_scan = scan_saham(tickers)
-
-    if df_scan is not None and not df_scan.empty:
-        # PANDAS 2.1+ REPLACEMENT: Menggunakan fungsi .map() sebagai pengganti .applymap()
-        def color_rows(val):
-            val_str = str(val)
-            if "BUY" in val_str: return 'background-color: #d4edda; color: #155724; font-weight: bold;'
-            if "SELL" in val_str: return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
-            if "Up-Trend" in val_str: return 'color: #28a745; font-weight: bold;'
-            if "Down-Trend" in val_str: return 'color: #dc3545; font-weight: bold;'
-            return ''
-
-        # Menggunakan .map() agar kompatibel dengan versi Pandas terbaru di server Streamlit
-        styled_df = df_scan.style.map(color_rows, subset=['Actionable', 'Trend'])\
-                                 .format({"Price": "Rp {:,.0f}", "Change %": "{:+.2f}%", "RSI": "{:.2f}"})
-        
-        st.dataframe(styled_df, use_container_width=True, height=450)
-        st.caption("💡 *Tip: Gunakan kolom pencarian di sebelah kanan atas tabel untuk menyaring emiten.*")
+    if len(saham_di_scan) == 0:
+        st.warning("Silakan pilih atau ketik minimal satu kode saham di sidebar sebelah kiri.")
     else:
-        st.error("Gagal memuat data scanner. Periksa koneksi internet atau daftarkan emiten di file csv dengan benar.")
+        with st.spinner(f"Memproses data untuk {len(saham_di_scan)} saham pilihan Anda dari Yahoo Finance..."):
+            df_scan = scan_saham(saham_di_scan)
+
+        if df_scan is not None and not df_scan.empty:
+            def color_rows(val):
+                val_str = str(val)
+                if "BUY" in val_str: return 'background-color: #d4edda; color: #155724; font-weight: bold;'
+                if "SELL" in val_str: return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
+                if "Up-Trend" in val_str: return 'color: #28a745; font-weight: bold;'
+                if "Down-Trend" in val_str: return 'color: #dc3545; font-weight: bold;'
+                return ''
+
+            styled_df = df_scan.style.map(color_rows, subset=['Actionable', 'Trend'])\
+                                     .format({"Price": "Rp {:,.0f}", "Change %": "{:+.2f}%", "RSI": "{:.2f}"})
+            
+            st.dataframe(styled_df, use_container_width=True, height=450)
+            st.caption("💡 *Tip: Anda dapat mengetik kode saham apa saja secara bebas pada menu 'Kustom Pilih Sendiri' di Sidebar.*")
+        else:
+            st.error("Gagal mengunduh data scanner. Pastikan kode emiten ditulis dengan benar.")
 
 # --- TAB 2: MARKET OVERVIEW ---
 with tab2:
     st.subheader("Market Performance Overview")
-    st.info("Fitur Market Heatmap menggunakan diagram batang interaktif untuk melihat performa pergerakan harga.")
     
-    if df_scan is not None and not df_scan.empty:
+    if len(saham_di_scan) > 0 and 'df_scan' in locals() and df_scan is not None and not df_scan.empty:
         fig_bar = go.Figure(go.Bar(
             x=df_scan['Ticker'],
             y=df_scan['Change %'],
@@ -156,7 +191,7 @@ with tab2:
         fig_bar.update_layout(title="Perubahan Harga Saham (%) Hari Ini", yaxis_title="Persentase Perubahan", template="plotly_white")
         st.plotly_chart(fig_bar, use_container_width=True)
     else:
-        st.warning("Data visualisasi heatmap belum tersedia karena unduhan bulk data kosong.")
+        st.warning("Data visualisasi belum tersedia. Saring kode saham terlebih dahulu di sidebar.")
 
 # --- TAB 3: INTERACTIVE ANALYSIS ---
 with tab3:
