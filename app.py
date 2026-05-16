@@ -158,14 +158,14 @@ with tab3:
     ticker_jk = f"{selected_stock}.JK"
     df_stock = get_single_stock_data(ticker_jk)
     
-    # Blok Pengaman Utama: Menghindari error layar merah (TypeError) jika data kosong
+    # Blok Pengaman Utama: Menghindari error layar merah jika data kosong
     if df_stock is not None and not df_stock.empty and len(df_stock) >= 2:
         try:
             last_row = df_stock.iloc[-1]
             prev_row = df_stock.iloc[-2]
             
             if pd.notna(last_row['Close']) and pd.notna(prev_row['Close']):
-                # Konversi data ke tipe float skalar dengan aman (kompatibel Multi-index atau Single-index)
+                # Konversi data ke tipe float skalar dengan aman
                 c_price = float(last_row['Close'].values) if hasattr(last_row['Close'], 'values') else float(last_row['Close'])
                 p_price = float(prev_row['Close'].values) if hasattr(prev_row['Close'], 'values') else float(prev_row['Close'])
                 
@@ -199,7 +199,7 @@ with tab3:
                     name="Harga Saham"
                 ))
                 
-                # Komponen Garis Moving Average overlay (Sudah diperbaiki kurungnya agar tidak terpotong)
+                # Komponen Garis Moving Average overlay
                 fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA20'], line=dict(color='orange', width=1.5), name="MA 20"))
                 fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA50'], line=dict(color='blue', width=1.5), name="MA 50"))
                 
@@ -214,3 +214,14 @@ with tab3:
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning(f"Data harga terbaru untuk {selected_stock} tidak lengkap di Yahoo Finance.")
+                
+        except Exception as e:
+            st.error(f"Terjadi kesalahan teknis saat merender grafik: {str(e)}")
+    else:
+        st.warning(f"⚠️ Gagal memuat data untuk {selected_stock}. Batasan request dari Yahoo Finance atau emiten sedang libur/suspensi. Silakan pilih kode saham lain di sidebar.")
+
+# --- 9. FOOTER ---
+st.markdown("---")
+st.markdown(f"© {datetime.now().year} **SwingScanner Pro** | Menggunakan Streamlit Modern | Data Source: Yahoo Finance")
