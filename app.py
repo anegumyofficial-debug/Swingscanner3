@@ -230,3 +230,59 @@ with tab1:
     if len(saham_di_scan) == 0:
         st.warning("Silakan pilih emiten terlebih dahulu pada menu Sidebar.")
     else:
+        with st.spinner(f"Memindai data teknikal {len(saham_di_scan)} emiten secara paralel..."):
+            df_scan = run_bulk_scanner(saham_di_scan)
+
+        if df_scan is not None and not df_scan.empty:
+            kolom_rapi = ["Ticker", "Price", "Change %", "Volume", "MA20", "MA50", "RSI", "Trend", "Keterangan", "Actionable"]
+            
+            for col in kolom_rapi:
+                if col not in df_scan.columns:
+                    df_scan[col] = 0.0 if col in ["Price", "Change %", "Volume", "MA20", "MA50", "RSI"] else "-"
+                    
+            df_display = df_scan[kolom_rapi].copy()
+
+            def color_rows(val):
+                val_str = str(val)
+                if "BUY" in val_str: return 'background-color: #d4edda; color: #155724; font-weight: bold;'
+                if "SELL" in val_str: return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
+                if "Up-Trend" in val_str: return 'color: #28a745; font-weight: bold;'
+                if "Down-Trend" in val_str: return 'color: #dc3545; font-weight: bold;'
+                if "Strong" in val_str: return 'color: #0056b3; font-weight: bold;'
+                return ''
+
+            # Menggunakan .map() versi modern yang aman dari AttributeError
+            styled_df = df_display.style.map(color_rows, subset=['Actionable', 'Trend', 'Keterangan'])\
+                                     .format({
+                                         "Price": "Rp {:,.0f}", 
+                                         "Change %": "{:+.2f}%", 
+                                         "Volume": "{:,.0f}",
+                                         "MA20": "Rp {:,.1f}",
+                                         "MA50": "Rp {:,.1f}",
+                                         "RSI": "{:.2f}"
+                                     })
+            
+            st.dataframe(styled_df, use_container_width=True, height=550)
+        else:
+            st.error("Gagal mendapatkan data scanner. Coba pilih kelompok emiten yang berbeda.")
+
+# --- TAB 2: MARKET OVERVIEW ---
+with tab2:
+    st.subheader("Market Performance Overview")
+    if df_scan is not None and not df_scan.empty:
+        df_chart = df_scan.sort_values(by="Change %", ascending=False).head(40)
+        fig_bar = go.Figure(go.Bar(
+            x=df_chart['Ticker'],
+            y=df_chart['Change %'],
+            marker_color=['#28a745' if change > 0 else '#dc3545' for change in df_chart['Change %']]
+        ))
+        fig_bar.update_layout(
+            title="Perubahan Harga Saham (%) Hari Ini (Maks. 40 Emiten)", 
+            yaxis_title="Persentase Perubahan", 
+            template="plotly_white"
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+    else:
+        st.warning("Data visualisasi belum tersedia. Jalankan scanner di Tab 1 terlebih dahulu.")
+
+#
