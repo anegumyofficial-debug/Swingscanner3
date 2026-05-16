@@ -359,9 +359,15 @@ with tab3:
             st.markdown("---")
             st.subheader(f"⚡ Kalkulator & Estimasi Target Scalping: {selected_stock}")
             
-            raw_atr = df_stock['ATR'].iloc[-1]
-            atr_val = float(raw_atr) if not pd.isna(raw_atr) and raw_atr > 0 else (c_price * 0.02)
-            
+            # Sistem pengaman berlapis jika nilai ATR terakhir bernilai NaN atau 0
+try:
+    raw_atr = df_stock['ATR'].dropna().iloc[-1] if 'ATR' in df_stock.columns else None
+    if raw_atr is not None and not pd.isna(raw_atr) and raw_atr > 0:
+        atr_val = float(raw_atr)
+    else:
+        atr_val = float(c_price * 0.025) # Jika ATR kosong, otomatis gunakan standar volatilitas 2.5%
+except:
+    atr_val = float(c_price * 0.025)            
             tp1_scalping = c_price + (atr_val * 0.5)
             tp2_scalping = c_price + (atr_val * 1.0)
             sl_scalping = c_price - (atr_val * 0.5)
