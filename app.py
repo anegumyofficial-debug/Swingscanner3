@@ -85,18 +85,21 @@ def load_all_indonesia_tickers():
 master_tickers_jk = load_all_indonesia_tickers()
 master_tickers_clean = [t.replace(".JK", "") for t in master_tickers_jk]
 
-# --- 4. DATA CLEANING UTILITY ---
+# --- 4. DATA CLEANING UTILITY (Sangat Ketat Meratakan Kolom) ---
 def clean_yf_dataframe(df):
     if df is None or df.empty:
         return None
+    # Jika terdeteksi MultiIndex (berlapis), paksa ambil level teratas saja (Open, High, Low, Close, Volume)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
+    
     df = df.copy()
+    # Bersihkan spasi sisa di nama kolom dan pastikan tipenya string tunggal murni
     df.columns = [str(col).strip() for col in df.columns]
     df.index = pd.to_datetime(df.index)
     return df
 
-# --- 5. DETEKSI INDIVIDUAL STOCK (DIPROTEKSI DARI SKEMA NA/EMPTY VALUE) ---
+# --- 5. DETEKSI INDIVIDUAL STOCK ---
 def fetch_and_analyze_stock(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
@@ -111,14 +114,12 @@ def fetch_and_analyze_stock(ticker):
         df['MA50'] = ta.sma(df['Close'], length=50)
         df['RSI'] = ta.rsi(df['Close'], length=14)
         
-        # Ekstraksi nilai akhir dengan validasi nilai kosong alternatif (Fallback ke harga close)
         last_price = float(df['Close'].iloc[-1])
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0.0
         
         last_volume = float(df['Volume'].iloc[-1]) if 'Volume' in df.columns and not pd.isna(df['Volume'].iloc[-1]) else 0.0
         
-        # Proteksi Nilai MA/RSI Kosong agar tidak merusak formatting tabel harian
         raw_ma20 = df['MA20'].iloc[-1]
         last_ma20 = float(raw_ma20) if not pd.isna(raw_ma20) else last_price
         
@@ -133,7 +134,6 @@ def fetch_and_analyze_stock(ticker):
         
         trend = "Up-Trend" if last_price > last_ma50 else "Down-Trend"
         
-        # Penentuan status keterangan pergerakan MA harian
         if last_price > last_ma20 and last_price > last_ma50:
             keterangan = "Diatas MA20 & MA50 (Strong)"
         elif last_price > last_ma20:
@@ -179,12 +179,12 @@ def run_bulk_scanner(ticker_list):
                 results.append(res)
     return pd.DataFrame(results)
 
-# --- 7. SINGLE STOCK FETCH ---
+# --- 7. SINGLE STOCK FETCH (Sekarang Diproteksi clean_yf_dataframe) ---
 @st.cache_data(ttl=120)
 def get_single_stock_data(ticker):
     try:
         df = yf.download(ticker, period="1y", interval="1d", progress=False)
-        df = clean_yf_dataframe(df)
+        df = clean_yf_dataframe(df) # Memastikan tabel diratakan sebelum dilempar ke visualisasi Plotly
         if df is None or len(df) < 20 or 'Close' not in df.columns:
             return None
         df['MA20'] = ta.sma(df['Close'], length=20)
@@ -234,4 +234,76 @@ with tab1:
         st.warning("Silakan pilih emiten terlebih dahulu pada menu Sidebar.")
     else:
         with st.spinner(f"Memindai data teknikal {len(saham_di_scan)} emiten secara paralel..."):
-            df_
+            df_scan = run_bulk_scanner(saham_di_scan)
+
+        if df_scan is not None and not df_scan.empty:
+            kolom_rapi = ["Ticker", "Price", "Change %", "Volume", "MA20", "MA50", "RSI", "Trend", "Keterangan", "Actionable"]
+            
+            for col in kolom_rapi:
+                if col not in df_scan.columns:
+                    df_scan[col] = 0.0 if col in ["Price", "Change %", "Volume", "MA20", "MA50", "RSI"] else "-"
+                    
+            df_display = df_scan[kolom_rapi].copy()
+
+            def color_rows(val):
+                val_str = str(val)
+                if "BUY" in val_str: return 'background-color: #d4edda; color: #155724; font-weight: bold;'
+                if "SELL" in val_str: return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
+                if "Up-Trend" in val_str: return 'color: #28a745; font-weight: bold;'
+                if "Down-Trend" in val_str: return 'color: #dc3545; font-weight: bold;'
+                if "Strong" in val_str: return 'color: #0056b3; font-weight: bold;'
+                return ''
+
+            styled_df = df_display.style.map(color_rows, subset=['Actionable', 'Trend', 'Keterangan'])\
+                                     .format({
+                                         "Price": "Rp {:,.0f}", 
+                                         "Change %": "{:+.2f}%", 
+                                         "Volume": "{:,.0f}",
+                                         "MA20": "Rp {:,.1f}",
+                                         "MA50": "Rp {:,.1f}",
+                                         "RSI": "{:.2f}"
+                                     })
+            
+            st.dataframe(styled_df, use_container_width=True, height=550)
+        else:
+            st.error("Gagal mendapatkan data scanner. Coba pilih kelompok emiten yang berbeda.")
+
+# --- TAB 2: MARKET OVERVIEW ---
+with tab2:
+    st.subheader("Market Performance Overview")
+    if df_scan is not None and not df_scan.empty:
+        df_chart = df_scan.sort_values(by="Change %", ascending=False).head(40)
+        fig_bar = go.Figure(go.Bar(
+            x=df_chart['Ticker'],
+            y=df_chart['Change %'],
+            marker_color=['#28a745' if change > 0 else '#dc3545' for change in df_chart['Change %']]
+        ))
+        fig_bar.update_layout(title="Perubahan Harga Saham (%) Hari Ini (Maks. 40 Emiten)", yaxis_title="Persentase Perubahan", template="plotly_white")
+        st.plotly_chart(fig_bar, use_container_width=True)
+    else:
+        st.warning("Data visualisasi belum tersedia. Jalankan scanner di Tab 1 terlebih dahulu.")
+
+# --- TAB 3: INTERACTIVE ANALYSIS ---
+with tab3:
+    st.subheader(f"Analisis Teknikal Mendalam: {selected_stock}")
+    
+    ticker_jk = f"{selected_stock}.JK"
+    df_stock = get_single_stock_data(ticker_jk)
+    
+    if df_stock is not None and not df_stock.empty and len(df_stock) >= 2 and 'Close' in df_stock.columns:
+        try:
+            c_price = float(df_stock['Close'].iloc[-1])
+            p_price = float(df_stock['Close'].iloc[-2])
+            
+            diff = c_price - p_price
+            pct = (diff / p_price) * 100 if p_price != 0 else 0.0
+            
+            raw_rsi_single = df_stock['RSI'].iloc[-1]
+            rsi_val = float(raw_rsi_single) if not pd.isna(raw_rsi_single) else 50.0
+            
+            raw_ma50_single = df_stock['MA50'].iloc[-1]
+            ma50_val = float(raw_ma50_single) if not pd.isna(raw_ma50_single) else c_price
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(label="Harga Terakhir", value=f
