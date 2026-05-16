@@ -17,22 +17,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. MASTER DATA EMITEN (Fallback jika CSV tidak ada) ---
+# --- 3. MASTER DATA EMITEN (LQ45 Pasang Dropback Aman) ---
 try:
     tickers = pd.read_csv('saham_list.csv')['Ticker'].tolist()
 except:
-    # Menggunakan format lengkap .JK agar yfinance langsung mengenali pasar bursa Indonesia
     tickers = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "UNVR.JK", "ADRO.JK", "PTBA.JK"]
 
-# --- 4. FUNGSI UTAS UNTUK MEMBERSIHKAN MULTI-INDEX ---
+# --- 4. FUNGSI UTAS UNTUK MEMBERSIHKAN MULTI-INDEX YAHOO FINANCE ---
 def clean_yf_dataframe(df):
     if df is None or df.empty:
         return None
-    # Jika kolom berbentuk Multi-Index (berlapis), ambil level teratas saja ('Close', 'Open', dll)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
-    
-    # Memastikan index berupa datetime yang bersih
     df.index = pd.to_datetime(df.index)
     return df
 
@@ -42,11 +38,8 @@ def get_single_stock_data(ticker):
     try:
         df = yf.download(ticker, period="1y", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
-        
         if df is None or len(df) < 20:
             return None
-            
-        # Hitung Indikator MA & RSI secara aman ke dalam single column
         df['MA20'] = ta.sma(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
         df['RSI'] = ta.rsi(df['Close'], length=14)
@@ -60,7 +53,6 @@ def scan_saham(ticker_list):
     results = []
     for ticker in ticker_list:
         try:
-            # Memastikan format penulisan ticker memiliki .JK
             formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
             df = yf.download(formatted_ticker, period="6mo", interval="1d", progress=False)
             df = clean_yf_dataframe(df)
@@ -68,12 +60,10 @@ def scan_saham(ticker_list):
             if df is None or len(df) < 50: 
                 continue
             
-            # Hitung Indikator
             df['MA20'] = ta.sma(df['Close'], length=20)
             df['MA50'] = ta.sma(df['Close'], length=50)
             df['RSI'] = ta.rsi(df['Close'], length=14)
             
-            # Ekstraksi nilai skalar baris terakhir dengan aman (.item() mencegah ambiguitas Series)
             last_price = float(df['Close'].iloc[-1])
             prev_price = float(df['Close'].iloc[-2])
             change_pct = ((last_price - prev_price) / prev_price) * 100
@@ -83,10 +73,8 @@ def scan_saham(ticker_list):
             last_ma50 = float(df['MA50'].iloc[-1])
             prev_ma20 = float(df['MA20'].iloc[-2])
             
-            # Logika Trend
             trend = "Up-Trend" if last_price > last_ma50 else "Down-Trend"
             
-            # Logika Sinyal (Actionable)
             if last_rsi < 35:
                 action = "BUY (Oversold)"
             elif last_price > last_ma20 and prev_price <= prev_ma20:
@@ -114,7 +102,6 @@ st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard</h1>", unsafe_a
 # --- 8. SIDEBAR CONTROL PANEL ---
 with st.sidebar:
     st.header("⚙️ Control Panel")
-    
     st.subheader("Analisis Saham Individual")
     clean_tickers = [t.replace(".JK", "") for t in tickers]
     selected_stock = st.selectbox("Pilih Saham untuk Grafik:", clean_tickers, index=0)
@@ -124,7 +111,6 @@ with st.sidebar:
     strategi = st.multiselect("Strategi Aktif:", 
                              ["MA 20 Cross", "RSI Oversold", "RSI Overbought"],
                              default=["MA 20 Cross", "RSI Oversold"])
-    
     min_rsi_filter = st.slider("Batas Minimum RSI", 0, 100, 30)
 
 # --- 9. DEFINISI LAYOUT TABS ---
@@ -138,20 +124,23 @@ with tab1:
         df_scan = scan_saham(tickers)
 
     if df_scan is not None and not df_scan.empty:
+        # PANDAS 2.1+ REPLACEMENT: Menggunakan fungsi .map() sebagai pengganti .applymap()
         def color_rows(val):
-            if "BUY" in str(val): return 'background-color: #d4edda; color: #155724; font-weight: bold;'
-            if "SELL" in str(val): return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
-            if "Up-Trend" in str(val): return 'color: #28a745; font-weight: bold;'
-            if "Down-Trend" in str(val): return 'color: #dc3545; font-weight: bold;'
+            val_str = str(val)
+            if "BUY" in val_str: return 'background-color: #d4edda; color: #155724; font-weight: bold;'
+            if "SELL" in val_str: return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
+            if "Up-Trend" in val_str: return 'color: #28a745; font-weight: bold;'
+            if "Down-Trend" in val_str: return 'color: #dc3545; font-weight: bold;'
             return ''
 
-        styled_df = df_scan.style.applymap(color_rows, subset=['Actionable', 'Trend'])\
+        # Menggunakan .map() agar kompatibel dengan versi Pandas terbaru di server Streamlit
+        styled_df = df_scan.style.map(color_rows, subset=['Actionable', 'Trend'])\
                                  .format({"Price": "Rp {:,.0f}", "Change %": "{:+.2f}%", "RSI": "{:.2f}"})
         
         st.dataframe(styled_df, use_container_width=True, height=450)
         st.caption("💡 *Tip: Gunakan kolom pencarian di sebelah kanan atas tabel untuk menyaring emiten.*")
     else:
-        st.error("Gagal memuat data scanner. Periksa koneksi internet server atau pastikan format kode emiten di file csv Anda benar.")
+        st.error("Gagal memuat data scanner. Periksa koneksi internet atau daftarkan emiten di file csv dengan benar.")
 
 # --- TAB 2: MARKET OVERVIEW ---
 with tab2:
@@ -178,7 +167,6 @@ with tab3:
     
     if df_stock is not None and not df_stock.empty and len(df_stock) >= 2:
         try:
-            # Menggunakan .iloc langsung pada DataFrame yang sudah diratakan kolomnya
             c_price = float(df_stock['Close'].iloc[-1])
             p_price = float(df_stock['Close'].iloc[-2])
             
@@ -188,7 +176,6 @@ with tab3:
             rsi_val = float(df_stock['RSI'].iloc[-1])
             ma50_val = float(df_stock['MA50'].iloc[-1])
             
-            # Tampilkan statistik ringkas harian
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric(label="Harga Terakhir", value=f"Rp {c_price:,.0f}", delta=f"{diff:+.0f} ({pct:+.2f}%)")
@@ -199,7 +186,6 @@ with tab3:
                 delta_ma = "Di atas MA50 (Bullish)" if c_price > ma50_val else "Di bawah MA50 (Bearish)"
                 st.metric(label="Posisi MA50", value=f"Rp {ma50_val:,.0f}", delta=delta_ma)
             
-            # Render grafik candlestick dengan aman
             fig = go.Figure()
             fig.add_trace(go.Candlestick(
                 x=df_stock.index,
