@@ -271,4 +271,153 @@ with tab1:
 
             styled_df = df_display.style.apply(color_scanner_rows, axis=1)\
                                      .format({
-                                         "Price
+                                         "Price": "Rp {:,.0f}", 
+                                         "Change %": "{:+.2f}%", 
+                                         "Volume": "{:,.0f}",
+                                         "MA20": "Rp {:,.1f}",
+                                         "MA50": "Rp {:,.1f}",
+                                         "RSI": "{:.2f}"
+                                     })
+            
+            st.dataframe(styled_df, use_container_width=True, height=550)
+        else:
+            st.error("Gagal mendapatkan data scanner. Coba pilih kelompok emiten yang berbeda.")
+
+# --- TAB 2: MARKET OVERVIEW ---
+with tab2:
+    st.subheader("Market Performance Overview")
+    if df_scan is not None and not df_scan.empty:
+        df_chart = df_scan.sort_values(by="Change %", ascending=False).head(40)
+        fig_bar = go.Figure(go.Bar(
+            x=df_chart['Ticker'],
+            y=df_chart['Change %'],
+            marker_color=['#28a745' if change > 0 else '#dc3545' for change in df_chart['Change %']]
+        ))
+        fig_bar.update_layout(
+            title="Perubahan Harga Saham (%) Hari Ini (Maks. 40 Emiten)", 
+            yaxis_title="Persentase Perubahan", 
+            template="plotly_white"
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+    else:
+        st.warning("Data visualisasi belum tersedia. Jalankan scanner di Tab 1 terlebih dahulu.")
+
+# --- TAB 3: INTERACTIVE ANALYSIS ---
+with tab3:
+    st.subheader(f"Analisis Teknikal Mendalam: {selected_stock}")
+    
+    ticker_jk = f"{selected_stock}.JK"
+    df_stock = get_single_stock_data(ticker_jk)
+    
+    if df_stock is not None and not df_stock.empty and len(df_stock) >= 2 and 'Close' in df_stock.columns and 'Open' in df_stock.columns:
+        try:
+            c_price = float(df_stock['Close'].iloc[-1])
+            p_price = float(df_stock['Close'].iloc[-2])
+            
+            diff = c_price - p_price
+            pct = (diff / p_price) * 100 if p_price != 0 else 0.0
+            
+            val_rsi = float(df_stock['RSI'].iloc[-1]) if not pd.isna(df_stock['RSI'].iloc[-1]) else 50.0
+            val_ma50 = float(df_stock['MA50'].iloc[-1]) if not pd.isna(df_stock['MA50'].iloc[-1]) else c_price
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(label="Harga Terakhir", value=f"Rp {c_price:,.0f}", delta=f"{diff:+.0f} ({pct:+.2f}%)")
+            with col2:
+                status_rsi = "Oversold (<35)" if val_rsi < 35 else ("Overbought (>70)" if val_rsi > 70 else "Neutral")
+                st.metric(label="RSI (14)", value=f"{val_rsi:.2f}", delta=status_rsi)
+            with col3:
+                status_ma = "Di atas MA50 (Bullish)" if c_price > val_ma50 else "Di bawah MA50 (Bearish)"
+                st.metric(label="Posisi MA50", value=f"Rp {val_ma50:,.0f}", delta=status_ma)
+            
+            fig = go.Figure()
+            fig.add_trace(go.Candlestick(
+                x=df_stock.index,
+                open=df_stock['Open'].squeeze(), 
+                high=df_stock['High'].squeeze(),
+                low=df_stock['Low'].squeeze(), 
+                close=df_stock['Close'].squeeze(),
+                name="Harga Saham"
+            ))
+            
+            fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA20'].squeeze(), line=dict(color='orange', width=1.5), name="MA 20"))
+            fig.add_trace(go.Scatter(x=df_stock.index, y=df_stock['MA50'].squeeze(), line=dict(color='blue', width=1.5), name="MA 50"))
+            
+            fig.update_layout(
+                title=f"Grafik Historis {selected_stock} (1 Tahun Terakhir)",
+                xaxis_title="Tanggal", yaxis_title="Harga (IDR)",
+                xaxis_rangeslider_visible=False, template="plotly_white",
+                height=500, hovermode="x unified"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # --- TABEL ESTIMASI KENAIKAN & PENURUNAN (SCALPING) ---
+            st.markdown("---")
+            st.subheader(f"⚡ Kalkulator & Estimasi Target Scalping: {selected_stock}")
+            
+            try:
+                raw_atr = df_stock['ATR'].dropna().iloc[-1] if 'ATR' in df_stock.columns else None
+                atr_val = float(raw_atr) if (raw_atr is not None and not pd.isna(raw_atr) and raw_atr > 0) else float(c_price * 0.025)
+            except:
+                atr_val = float(c_price * 0.025)
+            
+            tp1_scalping = c_price + (atr_val * 0.5)
+            tp2_scalping = c_price + (atr_val * 1.0)
+            sl_scalping = c_price - (atr_val * 0.5)
+            
+            pct_tp1 = ((tp1_scalping - c_price) / c_price) * 100
+            pct_tp2 = ((tp2_scalping - c_price) / c_price) * 100
+            pct_sl = ((sl_scalping - c_price) / c_price) * 100
+            
+            def sesuaikan_fraksi_bei(harga):
+                if harga < 200: return round(harga)
+                elif harga < 500: return round(harga / 2) * 2
+                elif harga < 2000: return round(harga / 5) * 5
+                elif harga < 5000: return round(harga / 10) * 10
+                else: return round(harga / 25) * 25
+                
+            tp1_clean = sesuaikan_fraksi_bei(tp1_scalping)
+            tp2_clean = sesuaikan_fraksi_bei(tp2_scalping)
+            sl_clean = sesuaikan_fraksi_bei(sl_scalping)
+            
+            data_scalping = {
+                "Skenario Pergerakan": [
+                    "🚀 Take Profit 1 (Target Konservatif)", 
+                    "🔥 Take Profit 2 (Target Maksimal Harian)", 
+                    "🛑 Stop Loss (Batas Risiko Maksimal)"
+                ],
+                "Estimasi Harga Target": [tp1_clean, tp2_clean, sl_clean],
+                "Estimasi Persentase (+/-)": [f"+{pct_tp1:.2f}%", f"+{pct_tp2:.2f}%", f"{pct_sl:.2f}%"],
+                "Rekomendasi Aksi": [
+                    "Jual Parsial / Amankan Profit Terdekat", 
+                    "Jual Bersih / Amankan Seluruh Keuntungan", 
+                    "Disiplin Cut Loss Jika Level Ini Tertembus"
+                ]
+            }
+            
+            df_scalping_table = pd.DataFrame(data_scalping)
+            
+            def color_scalping_rows(row):
+                styles = [''] * len(row)
+                if "Take Profit" in row["Skenario Pergerakan"]:
+                    styles = 'background-color: #e2f0d9; color: #385723; font-weight: bold;'
+                    styles = 'background-color: #e2f0d9; color: #385723; font-weight: bold;'
+                elif "Stop Loss" in row["Skenario Pergerakan"]:
+                    styles = 'background-color: #fce4d6; color: #c65911; font-weight: bold;'
+                    styles = 'background-color: #fce4d6; color: #c65911; font-weight: bold;'
+                return styles
+
+            styled_scalping = df_scalping_table.style.apply(color_scalping_rows, axis=1)\
+                                                    .format({"Estimasi Harga Target": "Rp {:,.0f}"})
+            
+            st.dataframe(styled_scalping, use_container_width=True, hide_index=True)
+            st.caption(f"*Metode perhitungan di atas didasarkan pada nilai **ATR (14 Harian) sebesar Rp {atr_val:.1f}**. Target harga disesuaikan secara otomatis dengan struktur fraksi harga (tick size) Bursa Efek Indonesia.")
+
+        except Exception as e:
+            st.error(f"Terjadi kesalahan teknis saat merender grafik & tabel: {str(e)}")
+    else:
+        st.warning(f"⚠️ Yahoo Finance tidak mengembalikan data untuk saham {selected_stock} saat ini. Silakan coba pilih kode saham lain pada menu Sidebar.")
+
+# --- 11. FOOTER ---
+st.markdown("---")
+st.markdown(f"© {datetime.now().year} **SwingScanner Pro** | Menggunakan Streamlit Modern | Data Source: Yahoo Finance")
