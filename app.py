@@ -155,7 +155,8 @@ def run_scalper_scanner(ticker_list):
 # --- 5. INTERFACE PANEL KONTROL & SIDEBAR ---
 st.markdown("<h1 class='main-title'>⚡ Scalper Radar Pro (Sinyal Siap Buy & Target TP/SL)</h1>", unsafe_allow_html=True)
 
-col_title1, col_title2 = st.columns()
+# PERBAIKAN UTAMA: Mengamankan inisialisasi kolom di Python 3.12
+col_title1, col_title2 = st.columns(2)
 with col_title1:
     st.write(f"Terakhir Sinkron: {datetime.now().strftime('%H:%M:%S')} WIB")
 with col_title2:
