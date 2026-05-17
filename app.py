@@ -20,7 +20,6 @@ st.markdown("""
 # --- 3. DATABASE EMITEN UTUH DAN LENGKAP (80+ EMITEN BEI) ---
 @st.cache_data(ttl=604800)
 def load_all_market_tickers():
-    # Mengembalikan daftar lengkap emiten aktif Anda seperti versi sebelumnya
     saham_lengkap = [
         "AADI", "AALI", "ABBA", "ABDA", "ABMM", "ACES", "ACST", "ADCP", "ADHI", "ADME",
         "ADRO", "AKRA", "AMMN", "AMRT", "ANTM", "APEX", "ARNA", "ARTO", "ASII", "ASRI", 
@@ -50,7 +49,7 @@ def clean_yf_dataframe(df):
     df.columns = [str(col).strip() for col in df.columns]
     return df
 
-# --- 4. ENGINE ANALISIS INTERDAY SCALPING & TARGET PROFIT ---
+# --- 4. ENGINE ANALISIS INTERDAY SCALPING & VALIDASI FILTER ---
 def analyze_scalping_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
@@ -59,7 +58,7 @@ def analyze_scalping_momentum(ticker):
         df = yf.download(formatted_ticker, period="3d", interval="5m", progress=False)
         df = clean_yf_dataframe(df)
         
-        if df is None or len(df) < 15 or 'Close' not in df.columns: 
+        if df is None or len(df) < 25 or 'Close' not in df.columns: 
             return None
         
         # Perhitungan Indikator Jalur VWAP
@@ -74,23 +73,37 @@ def analyze_scalping_momentum(ticker):
         
         df['EMA9'] = ta.ema(df['Close'], length=9)
         
+        # --- VALIDASI TAMBAHAN (VOLUME SPIKE & TURNOVER) ---
+        df['Vol_MA20'] = df['Volume'].rolling(window=20).mean()
+        total_turnover_today = (df['Close'] * df['Volume']).sum()
+        
         # Data Menit Terakhir
         last_price = float(df['Close'].iloc[-1])
         last_vwap = float(df['VWAP'].iloc[-1])
         last_k = float(df['STOCHk'].iloc[-1])
         last_d = float(df['STOCHd'].iloc[-1])
         last_ema = float(df['EMA9'].iloc[-1])
+        last_volume = float(df['Volume'].iloc[-1])
+        last_vol_ma = float(df['Vol_MA20'].iloc[-1]) if not pd.isna(df['Vol_MA20'].iloc[-1]) else 1.0
         
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
         
         ticker_name = ticker.replace(".JK", "")
         
-        # LOGIKA ESTIMASI ARAH, STOP LOSS, & TAKE PROFIT (Rasio Risk:Reward Sehat)
+        # Penilaian Validitas Volume dan Likuiditas
+        is_volume_spike = last_volume > (last_vol_ma * 1.5)
+        is_highly_liquid = total_turnover_today > 5_000_000_000  # Minimal Rp 5 Miliar
+        
+        # LOGIKA ESTIMASI ARAH, STOP LOSS, & TAKE PROFIT
         if last_price > last_vwap and last_price > last_ema and last_k > last_d and last_k < 45:
-            direction = "🚀 STRONG UP (Siap Buy)"
+            # Sinyal Tertinggi hanya jika lolos uji Volume Spike dan Likuiditas Pasar
+            if is_volume_spike and is_highly_liquid:
+                direction = "🚀 STRONG UP (Siap Buy)"
+            else:
+                direction = "📈 UP MOMENTUM (Koleksi)"
+                
             stop_loss_est = round(min(last_vwap, last_ema), 0)
-            # Jarak resiko digunakan sebagai acuan take profit kilat (Rasio 1 : 1.5)
             risk_distance = max(last_price - stop_loss_est, last_price * 0.01)
             take_profit_est = round(last_price + (risk_distance * 1.5), 0)
             
@@ -118,6 +131,7 @@ def analyze_scalping_momentum(ticker):
             "Ticker": ticker_name,
             "Live Price": last_price,
             "5m Change %": round(change_pct, 2),
+            "Turnover (B)": round(total_turnover_today / 1_000_000_000, 2),
             "VWAP Intraday": round(last_vwap, 0),
             "Stoch %K": round(last_k, 2),
             "Stoch %D": round(last_d, 2),
@@ -140,16 +154,20 @@ def run_scalper_scanner(ticker_list):
 
 # --- 5. INTERFACE PANEL KONTROL & SIDEBAR ---
 st.markdown("<h1 class='main-title'>⚡ Scalper Radar Pro (Sinyal Siap Buy & Target TP/SL)</h1>", unsafe_allow_html=True)
-st.write(f"Terakhir Sinkron: {datetime.now().strftime('%H:%M:%S')} WIB")
+
+col_title1, col_title2 = st.columns()
+with col_title1:
+    st.write(f"Terakhir Sinkron: {datetime.now().strftime('%H:%M:%S')} WIB")
+with col_title2:
+    if st.button("🔄 Tembak Refresh Data", use_container_width=True):
+        st.cache_data.clear()
 
 with st.sidebar:
     st.header("⚙️ Filter Validasi Pasar")
     
-    # Fitur Validasi Pemangkas Tabel: Hanya menampilkan yang valid siap beli saja
     only_ready_to_buy = st.checkbox("🎯 Hanya Tampilkan Sinyal SIAP BUY", value=False)
     
     st.markdown("---")
-    # Pilihan cakupan emiten pantauan
     saham_pilihan = st.multiselect(
         "Pilih Emiten Pantauan:", 
         options=master_tickers_clean, 
@@ -160,14 +178,11 @@ if len(saham_pilihan) > 0:
     df_scalp = run_scalper_scanner(saham_pilihan)
     
     if not df_scalp.empty:
-        # Jalankan filter validasi jika tombol di sidebar dicentang
         if only_ready_to_buy:
-            df_scalp = df_scalp[df_scalp["Est. Arah"].str.contains("STRONG UP|UP MOMENTUM")]
+            df_scalp = df_scalp[df_scalp["Est. Arah"].str.contains("STRONG UP")]
         
-        # Urutkan berdasarkan momentum kenaikan tertinggi harian intraday
         df_scalp = df_scalp.sort_values(by="5m Change %", ascending=False)
         
-        # Penataan gaya baris tabel real-time
         def style_scalper(row):
             styles = [''] * len(row)
             arah = str(row['Est. Arah'])
@@ -191,6 +206,7 @@ if len(saham_pilihan) > 0:
                                       .format({
                                           "Live Price": "Rp {:,.0f}",
                                           "5m Change %": "{:+.2f}%",
+                                          "Turnover (B)": "{:,.2f} B",
                                           "VWAP Intraday": "Rp {:,.0f}",
                                           "Stoch %K": "{:.2f}",
                                           "Stoch %D": "{:.2f}",
@@ -200,12 +216,12 @@ if len(saham_pilihan) > 0:
             
             st.dataframe(styled_df, use_container_width=True, height=450)
         else:
-            st.warning("⚠️ Tidak ada emiten yang lolos filter validasi 'Siap Buy' saat ini. Coba perluas pilihan saham Anda.")
+            st.warning("⚠️ Tidak ada emiten yang lolos filter validasi ketat 'Siap Buy' saat ini. Kemungkinan volume transaksi / turnover pasar belum memenuhi syarat minimal.")
             
         st.markdown("""
-        ### 💡 Cara Cepat Membaca Tabel Eksekusi:
-        * **Kolom Proteksi Stop Loss (SL):** Jaga-jaga batas aman apabila posisi berbalik arah. Segera lakukan pembatasan resiko jika menyentuh level ini.
-        * **Kolom Estimasi Take Profit (TP):** Target rasional ideal terdekat untuk merealisasikan keuntungan tanpa harus menunggu terlalu lama (sifat *scalping* kilat).
+        ### 💡 Perubahan Struktur Validasi Baru:
+        * **Kolom Turnover (B):** Menampilkan nilai transaksi berjalan dalam satuan Miliar Rupiah. Saham dengan turnover di bawah 5 Miliar otomatis akan diturunkan statusnya untuk menghindari jebakan likuiditas.
+        * **Validasi Sinyal:** Status `🚀 STRONG UP` kini dilindungi sistem pendeteksi lonjakan volume mendadak agar Anda terhindar dari pembalikan harga sepihak (*Fake Breakout*).
         """)
     else:
         st.info("Gagal memuat data intraday pasar. Pastikan jam bursa berjalan atau server Yahoo Finance merespon.")
