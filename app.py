@@ -6,43 +6,71 @@ from datetime import datetime
 import concurrent.futures
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Scalper Radar BEI - Full Edition", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="Swing & Scalper Dashboard BEI", layout="wide", page_icon="📈")
 
-# --- 2. CUSTOM CSS SCALPER ---
+# --- 2. CUSTOM CSS EMITEN ---
 st.markdown("""
     <style>
     .stApp { background-color: #0F172A; color: #E2E8F0; }
     div[data-testid="stMetricValue"] { font-size: 24px; font-weight: bold; color: #F8FAFC; }
-    .main-title { color: #38BDF8; font-weight: 800; padding-bottom: 10px; }
+    .main-title { color: #38BDF8; font-weight: 800; padding-bottom: 5px; }
+    .sub-text { color: #94A3B8; font-size: 14px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE EMITEN DIPERLUAS & SUPER LENGKAP (150+ EMITEN TERMASUK CBDK, CMRY, DSSA) ---
+# --- 3. DATABASE MASTER EMITEN SUPER LENGKAP (300+ SAHAM BEI) ---
 @st.cache_data(ttl=604800)
-def load_all_market_tickers():
-    saham_lengkap = [
-        # --- Emiten yang Anda Minta Tambahkan ---
-        "CBDK", "CMRY", "DSSA", 
-        # --- Sisa Emiten Database Utama ---
-        "AADI", "AALI", "ABBA", "ABDA", "ABMM", "ACES", "ACST", "ADCP", "ADHI", "ADME",
-        "ADRO", "AGRO", "AGRS", "AKRA", "AMMN", "AMRT", "ANTM", "APEX", "APLN", "ARNA", 
-        "ARTO", "ASII", "ASRI", "ASSA", "AUTO", "AVIA", "BBCA", "BBNI", "BBRI", "BBTN", 
-        "BBYB", "BCIC", "BDMN", "BFIN", "BGTG", "BIPP", "BKSL", "BMRI", "BMTR", "BNGA", 
-        "BNLI", "BRMS", "BRIS", "BSDE", "BTEK", "BTPS", "BUMI", "BUVA", "BYAN", "CARS", 
-        "CENT", "CINT", "CLEO", "CMNP", "CNTX", "CPIN", "CTRA", "DIGI", "DILD", "DLTA", 
-        "DMMX", "DMAS", "DOOH", "ELSA", "EMTK", "ENRG", "EXCL", "FAST", "FILM", "FORU", 
-        "FPNI", "GARA", "GDST", "GGRM", "GIAA", "GJTL", "GOTO", "GPSO", "HDFA", "HEAL", 
-        "HISP", "HMPA", "HMSP", "HRUM", "IATA", "INCF", "INDF", "INDY", "INKP", "INTP", 
-        "ISAT", "ITMG", "KAEF", "KIJA", "KLBF", "KPIG", "KREN", "LANC", "LPKR", "LPPF", 
-        "MAPI", "MAPA", "MDKA", "MEDC", "MLPL", "MNCN", "MPPA", "MYOR", "NATO", "NZIA", 
-        "OASA", "PANS", "PBRX", "PGAS", "PGJO", "PNBS", "PNLF", "PSSI", "PTBA", "PTPP", 
-        "PWON", "RMKO", "SAME", "SCMA", "SIDO", "SMGR", "SMRA", "SRTG", "SSMS", "TARA", 
-        "TBIG", "TIMS", "TINS", "TLKM", "TOWR", "TPIA", "UNTR", "UNVR", "VKTR", "WIKA", 
-        "WOOD", "YULE", "ZBRA"
+def load_mega_market_tickers():
+    # Menggabungkan seluruh sektor utama di BEI (Bluechip, Mid-cap, Small-cap, & IPO Baru)
+    saham_300_plus = [
+        "AADI", "AALI", "ABBA", "ABDA", "ABMM", "ACES", "ACST", "ADCP", "ADHI", "ADME", "ADRO", "AGRO", "AGRS", "AHAP", "AISA",
+        "AKRA", "AKSI", "ALDO", "ALKA", "ALMI", "AMAG", "AMAN", "AMAR", "AMMN", "AMOR", "AMRT", "ANDI", "ANER", "ANTM", "APEX",
+        "APII", "APLN", "ARGO", "ARII", "ARKA", "ARNA", "ARTA", "ARTO", "ASBI", "ASGR", "ASII", "ASJT", "ASMI", "ASPI", "ASRI",
+        "ASSA", "ATAP", "ATIC", "AUTO", "AVIA", "AWAN", "AYAM", "BADI", "BAJA", "BALI", "BANK", "BAPA", "BAPP", "BARA", "BATA",
+        "BAUT", "BBCA", "BBHI", "BBIK", "BBLD", "BBMD", "BBNI", "BBRI", "BBRM", "BBTN", "BBUV", "BBYB", "BCIC", "BCIP", "BDMN",
+        "BEEF", "BEKS", "BFIN", "BFTC", "BGTG", "BHAT", "BHIT", "BIMA", "BIPI", "BIPP", "BIRD", "BISI", "BKDP", "BKSL", "BKSW",
+        "BMAS", "BMBL", "BMRI", "BMTR", "BNGA", "BNLI", "BNII", "BOBA", "BOLA", "BORO", "BPII", "BRMS", "BRIS", "BRNA", "BRPT",
+        "BSDE", "BSIM", "BSSR", "BSWD", "BTEK", "BTPS", "BUKK", "BUVA", "BUMI", "BUTI", "BVIC", "BWPT", "BYAN", "CADI", "CAMP",
+        "CANT", "CARE", "CARS", "CASA", "CASH", "CASS", "CATT", "CEKA", "CENT", "CESS", "CFIN", "CINT", "CITA", "CITY", "CLAY",
+        "CLEO", "CLPI", "CMNP", "CMRY", "CNMA", "CNTX", "COAL", "COCO", "CPIN", "CPRI", "CPRO", "CSAP", "CSIS", "CSRA", "CTRA",
+        "CTTH", "CUAN", "CYBER", "DAAZ", "DART", "DAYA", "DEAL", "DEFI", "DEWA", "DFAM", "DGIK", "DHCO", "DIGI", "DILD", "DIVA",
+        "DKFT", "DLTA", "DMAS", "DMED", "DMMX", "DNAR", "DOMI", "DOOH", "DPNS", "DPUM", "DRMA", "DSSA", "DSFI", "DSNG", "DTAL",
+        "DUTO", "DVLA", "DXJN", "DYAN", "EAST", "ECII", "EDII", "EKAD", "ELIT", "ELSA", "EMAL", "EMDE", "EMTK", "ENRG", "EPAC",
+        "EPMT", "ERAA", "ERTX", "ESIP", "ESSA", "ESTA", "ETWA", "EXCL", "FAPA", "FAST", "FASW", "FEST", "FIKA", "FILM", "FINN",
+        "FIRE", "FMII", "FPNI", "FORU", "FOTA", "FRAS", "FUJI", "GAMA", "GAMR", "GARA", "GCOAL", "GDST", "GDYR", "GEMS", "GGRM",
+        "GHEO", "GIAA", "GJTL", "GLOB", "GMCW", "GMTD", "GOLD", "GOTO", "GPRA", "GPSO", "GRHA", "GRIA", "GRPM", "GSMF", "GSJA",
+        "GTBO", "HAIS", "HAKA", "HAMP", "HDFA", "HDIT", "HEAL", "HELI", "HERO", "HEXA", "HIKAM", "HINT", "HISP", "HKMU", "HLIT",
+        "HMAI", "HMPA", "HMSP", "HOKI", "HOMI", "HOTL", "HRTA", "HRUM", "IATA", "IBOS", "IBST", "ICBP", "ICON", "IDPR", "IKAN",
+        "IKBI", "IKHA", "IMAS", "IMJS", "IMPC", "INAF", "INCF", "INDF", "indo", "INDX", "INDY", "INKP", "INPC", "INPP", "INPS",
+        "INRU", "INTA", "INTD", "INTP", "IPAC", "IPCC", "IPCM", "IPOL", "IRRA", "ISAT", "ISSP", "ITMA", "ITMG", "JAWA", "JECC",
+        "JGLE", "JIHD", "JKON", "JKSW", "JMAS", "JPFA", "JRPT", "JSKY", "JSMR", "JSTB", "JTPE", "KAEF", "KICI", "KIJA", "KKGI",
+        "KLBF", "KLAS", "KMDS", "KOBX", "KOIN", "KOKA", "KOTA", "KPAL", "KPAS", "KPIG", "KREN", "KRNA", "KRAS", "KRAH", "KREI",
+        "LION", "LPCK", "LPKR", "LPLI", "LPPF", "LPPS", "LRN",  "LSIP", "LTLS", "LUCK", "LUMI", "MAIN", "MAMI", "MAPA", "MAPI",
+        "MARI", "MARK", "MASA", "MAYA", "MBAP", "MBSS", "MBTO", "MCOL", "MDIA", "MDKA", "MDKI", "MDLN", "MEDC", "MEGA", "MERK",
+        "META", "MFIN", "MGNA", "MHAX", "MICE", "MIDI", "MILA", "MINA", "MINK", "MIRA", "MITI", "MKNT", "MKPI", "MLBI", "MLIA",
+        "MLPL", "MLPT", "MMIX", "MNCN", "MPMX", "MPPA", "MRAT", "MRPK", "MSIN", "MSKY", "MTDL", "MTEL", "MTFN", "MTLA", "MTMH",
+        "MTPS", "MTRA", "MTSM", "MUTU", "MYOH", "MYOR", "MYTX", "NANO", "NASA", "NASI", "NATO", "NAIK", "NBHA", "NELY", "NETV",
+        "NFCX", "NICK", "NICL", "NIRO", "NISP", "NMSL", "NOBU", "NRCA", "NREI", "NTBK", "NUSA", "NVOM", "NZIA", "OASA", "OBMD",
+        "ODEC", "OILS", "OKAS", "OMRE", "OPMS", "PADI", "PALM", "PAMA", "PANB", "PANI", "PANR", "PANS", "PBID", "PBRX", "PBSA",
+        "PCAR", "PDES", "PEGE", "PEHA", "PGAS", "PGJO", "PGLI", "PICO", "PIHA", "PMMP", "PMJS", "PNBS", "PNIN", "PNLF", "PNSE",
+        "POLY", "POOL", "PORT", "POWR", "PPRI", "PPRE", "PPRO", "PRAS", "PRDA", "PRIM", "PRST", "PSAB", "PSDN", "PSGO", "PSSI",
+        "PTBA", "PTDU", "PTIS", "PUDP", "PURA", "PURE", "PURI", "PWON", "PYFA", "RAAM", "RACY", "RAFI", "RAJA", "RALS", "RANC",
+        "RBMS", "RCCC", "RELI", "REMD", "RICY", "RIGS", "RIMO", "RMKO", "ROCK", "RODA", "ROTI", "SAGE", "S固M", "SAIP", "SAME",
+        "SAMF", "SATU", "SBAT", "SCCO", "SCMA", "SCNP", "SDMU", "SDPC", "SDRA", "SEMA", "SFAN", "SGER", "SGIK", "SGRO", "SHID",
+        "SIAP", "SICO", "SIDO", "SILO", "SIMA", "SIMP", "SINI", "SIPD", "SKBM", "SKLT", "SMAR", "SMBR", "SMCB", "SMDM", "SMDR",
+        "SMGR", "SMIL", "SMKM", "SMMA", "SMRA", "SMRU", "SMSM", "SNLK", "SOCI", "SOFE", "SOHO", "SONA", "SPMA", "SPTO", "SRSN",
+        "SRTG", "SSIA", "SSMS", "SSTM", "STAR", "STAA", "SUGI", "SULI", "SUPR", "SURE", "SURYA", "SUSU", "TAIS", "TAMU", "TAMP",
+        "TAPG", "TARA", "TAXI", "TBIG", "TBMS", "TCID", "TCPI", "TEBE", "TECH", "TELE", "TENI", "TFAS", "TFCO", "TGKA", "TGRA",
+        "TIFA", "TINS", "TIRA", "TIRT", "TKIM", "TLKM", "TLDN", "TMAS", "TMPO", "TOBA", "TOGA", "TONS", "TOTAL", "TOTO", "TOWR",
+        "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN",
+        "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS",
+        "vone", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS",
+        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE"
     ]
-    return sorted([f"{t}.JK" for t in saham_lengkap])
+    # Konversi otomatis ke format Yahoo Finance dan pastikan huruf besar
+    return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
 
-master_tickers_jk = load_all_market_tickers()
+master_tickers_jk = load_mega_market_tickers()
 master_tickers_clean = [t.replace(".JK", "") for t in master_tickers_jk]
 
 def clean_yf_dataframe(df):
@@ -54,183 +82,204 @@ def clean_yf_dataframe(df):
     df.columns = [str(col).strip() for col in df.columns]
     return df
 
-# --- 4. ENGINE ANALISIS INTERDAY SCALPING & VALIDASI FILTER ---
-def analyze_scalping_momentum(ticker):
+# --- 4. CORE ENGINE MULTI-TIMEFRAME (SWING + SCALPING MOMENTUM) ---
+def analyze_market_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
         
-        # Mode Utama: Ambil data intraday 5 menit terbaru
-        df = yf.download(formatted_ticker, period="3d", interval="5m", progress=False)
+        # PERBAIKAN VALIDASI: Mengambil data 3 bulan terakhir (interval harian untuk jaminan 24 jam)
+        df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
-        is_fallback = False
         
-        # Mode Cadangan: Berpindah ke harian jika bursa tutup/menitan kosong di server Yahoo
-        if df is None or len(df) < 15 or 'Close' not in df.columns:
-            df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
-            df = clean_yf_dataframe(df)
-            is_fallback = True
-            
-        if df is None or len(df) < 15 or 'Close' not in df.columns: 
+        # Pelonggaran batas baris data dari 15 menjadi 4 agar seluruh emiten sepi/baru lolos render
+        if df is None or len(df) < 4 or 'Close' not in df.columns: 
             return None
         
-        # Indikator Jalur VWAP / MA
-        if not is_fallback:
-            cum_vol = df['Volume'].cumsum()
-            cum_vol_price = (df['Close'] * df['Volume']).cumsum()
-            df['VWAP'] = cum_vol_price / cum_vol
-        else:
-            df['VWAP'] = ta.ema(df['Close'], length=20)
-        
-        # Stochastic Oscillator
-        stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=14, d=3)
-        df['STOCHk'] = stoch['STOCHk_14_3_3']
-        df['STOCHd'] = stoch['STOCHd_14_3_3']
-        
+        # Penghitungan Indikator Baseline Tren Utama
         df['EMA9'] = ta.ema(df['Close'], length=9)
+        df['EMA20'] = ta.ema(df['Close'], length=20)
+        df['MA50'] = ta.sma(df['Close'], length=50)
+        df['RSI'] = ta.rsi(df['Close'], length=14)
         df['Vol_MA20'] = df['Volume'].rolling(window=20).mean()
-        total_turnover_today = (df['Close'] * df['Volume']).sum()
         
-        # Data Menit/Hari Terakhir
+        # Perhitungan Stochastic untuk Wilayah Jenuh Jual/Beli
+        stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=14, d=3)
+        df['STOCHk'] = stoch['STOCHk_14_3_3'] if 'STOCHk_14_3_3' in stoch.columns else 50.0
+        df['STOCHd'] = stoch['STOCHd_14_3_3'] if 'STOCHd_14_3_3' in stoch.columns else 50.0
+        
+        # Ekstraksi Data Baris Terakhir (Live Terupdate)
         last_price = float(df['Close'].iloc[-1])
-        last_vwap = float(df['VWAP'].iloc[-1]) if not pd.isna(df['VWAP'].iloc[-1]) else last_price
+        last_ema9 = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
+        last_ema20 = float(df['EMA20'].iloc[-1]) if not pd.isna(df['EMA20'].iloc[-1]) else last_price
+        last_ma50 = float(df['MA50'].iloc[-1]) if not pd.isna(df['MA50'].iloc[-1]) else last_price
+        last_rsi = float(df['RSI'].iloc[-1]) if not pd.isna(df['RSI'].iloc[-1]) else 50.0
         last_k = float(df['STOCHk'].iloc[-1]) if not pd.isna(df['STOCHk'].iloc[-1]) else 50.0
         last_d = float(df['STOCHd'].iloc[-1]) if not pd.isna(df['STOCHd'].iloc[-1]) else 50.0
-        last_ema = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
         last_volume = float(df['Volume'].iloc[-1])
         last_vol_ma = float(df['Vol_MA20'].iloc[-1]) if not pd.isna(df['Vol_MA20'].iloc[-1]) else 1.0
         
+        # Perubahan Harga
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
         
+        # Turnover Riil Berjalan (Satuan Miliar Rupiah)
+        total_turnover_today = (last_price * last_volume)
+        
+        # Klasifikasi Arah Tren Utama
+        if last_price > last_ema20 and last_ema20 > last_ma50:
+            trend_label = "🟩 Up-Trend"
+        elif last_price < last_ema20 and last_ema20 < last_ma50:
+            trend_label = "🟥 Down-Trend"
+        else:
+            trend_label = "🟨 Sideways"
+            
         ticker_name = ticker.replace(".JK", "")
         
-        # Penilaian Lonjakan Volume & Likuiditas Riil
-        is_volume_spike = last_volume > (last_vol_ma * 1.3)
-        is_highly_liquid = total_turnover_today > 2_000_000_000  # Standar disesuaikan ke 2B agar menangkap saham mid-cap pasca penutupan
-        
-        # LOGIKA ESTIMASI ARAH, STOP LOSS, & TAKE PROFIT
-        if last_price > last_vwap and last_price > last_ema and last_k > last_d and last_k < 50:
-            if is_volume_spike and is_highly_liquid:
-                direction = "🚀 STRONG UP (Siap Buy)"
-            else:
-                direction = "📈 UP MOMENTUM (Koleksi)"
-                
-            stop_loss_est = round(min(last_vwap, last_ema), 0)
-            risk_distance = max(last_price - stop_loss_est, last_price * 0.01)
-            take_profit_est = round(last_price + (risk_distance * 1.5), 0)
+        # DETEKSI TRIGGER AKSI (ACTIONABLE SIGNAL)
+        # 1. Kondisi Super Buy (Breakout Volume + Rebound dari Bottom)
+        if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.2):
+            action_signal = "🔥 SUPER BUY"
+            stop_loss = round(min(last_ema9, last_ema20), 0)
+            take_profit = round(last_price + ((last_price - stop_loss) * 1.5), 0)
             
-        elif last_price > last_vwap and last_k > last_d:
-            direction = "📈 UP MOMENTUM (Koleksi)"
-            stop_loss_est = round(last_vwap, 0)
-            risk_distance = max(last_price - stop_loss_est, last_price * 0.01)
-            take_profit_est = round(last_price + (risk_distance * 1.5), 0)
+        # 2. Kondisi Oversold Buy (Rebound murni struktur bawah)
+        elif last_k > last_d and (last_rsi < 30 or last_k < 20):
+            action_signal = "🎯 BUY (Oversold)"
+            stop_loss = round(last_price * 0.96, 0)
+            take_profit = round(last_price * 1.06, 0)
             
-        elif last_price < last_ema and last_k < last_d and last_k > 65:
-            direction = "🚨 DUMP RISK (Jangan Haka)"
-            stop_loss_est = round(last_price * 0.99, 0)
-            take_profit_est = 0
-            
-        elif last_price < last_vwap:
-            direction = "📉 DOWN (Hindari)"
-            stop_loss_est = 0
-            take_profit_est = 0
+        # 3. Kondisi Sinyal Peringatan Jenuh Beli / Distribusi
+        elif last_price < last_ema9 and last_k < last_d and last_rsi > 70:
+            action_signal = "🚨 RISK (Jenuh Beli)"
+            stop_loss = 0
+            take_profit = 0
         else:
-            direction = "⏳ SIDEWAYS (Wait)"
-            stop_loss_est = round(last_price * 0.99, 0)
-            take_profit_est = round(last_price * 1.02, 0)
-            
-        if is_fallback:
-            direction += " [Hari Kemarin]"
+            action_signal = "⏳ Wait / Neutral"
+            stop_loss = 0
+            take_profit = 0
             
         return {
             "Ticker": ticker_name,
-            "Live Price": last_price,
+            "Price": last_price,
             "Change %": round(change_pct, 2),
-            "Turnover (B)": round(total_turnover_today / 1_000_000_000, 2),
-            "VWAP/MA Baseline": round(last_vwap, 0),
-            "Stoch %K": round(last_k, 2),
-            "Stoch %D": round(last_d, 2),
-            "Est. Arah": direction,
-            "Proteksi Stop Loss": stop_loss_est,
-            "Estimasi Take Profit": take_profit_est
+            "Turnover (B)": round(total_turnover_today / 1_000_000_000, 3),
+            "EMA9 Baseline": round(last_ema9, 0),
+            "MA50 Long": round(last_ma50, 0),
+            "RSI": round(last_rsi, 2),
+            "Trend": trend_label,
+            "Actionable": action_signal,
+            "Proteksi SL": stop_loss,
+            "Target TP": take_profit
         }
     except:
         return None
 
-def run_scalper_scanner(ticker_list):
+def run_mega_scanner(ticker_list):
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-        future_to_ticker = {executor.submit(analyze_scalping_momentum, t): t for t in ticker_list}
+    # ThreadPool Executor ditingkatkan kinerjanya ke 25 workers agar scan 300+ emiten selesai sekejap
+    with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
+        future_to_ticker = {executor.submit(analyze_market_momentum, t): t for t in ticker_list}
         for future in concurrent.futures.as_completed(future_to_ticker):
             res = future.result()
             if res is not None:
                 results.append(res)
     return pd.DataFrame(results)
 
-# --- 5. INTERFACE PANEL KONTROL & SIDEBAR ---
-st.markdown("<h1 class='main-title'>⚡ Scalper Radar Pro (Sinyal Siap Buy & Target TP/SL)</h1>", unsafe_allow_html=True)
+# --- 5. INTERFACE PANEL UTAMA KONTROL & DASHBOARD ---
+st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
-col_title1, col_title2 = st.columns(2)
+# Layout Tombol Sinkronisasi Atas
+col_title1, col_title2 = st.columns()
 with col_title1:
-    st.write(f"Terakhir Sinkron: {datetime.now().strftime('%H:%M:%S')} WIB")
+    st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
 with col_title2:
-    if st.button("🔄 Tembak Refresh Data", use_container_width=True):
+    if st.button("🔄 Paksa Refresh & Bersihkan Cache", use_container_width=True):
         st.cache_data.clear()
 
+# PANEL SIDEBAR KONTROL SENSOR
 with st.sidebar:
-    st.header("⚙️ Filter Validasi Pasar")
-    only_ready_to_buy = st.checkbox("🎯 Hanya Tampilkan Sinyal SIAP BUY", value=False)
+    st.header("⚙️ Panel Filter Pencarian")
+    
+    # Filter Tipe Sinyal Langsung
+    filter_mode = st.radio(
+        "Saring Kategori Sinyal:",
+        options=["Tampilkan Semua Emiten", "Hanya Sinyal BUY / SUPER BUY", "Hanya Struktur Up-Trend"]
+    )
+    
     st.markdown("---")
     
-    # Nilai bawaan default diubah ke saham pilihan baru Anda agar langsung terpantau saat app dibuka
+    # Selektor Emiten Terbuka (Default langsung mengunci target prioritas Anda)
     saham_pilihan = st.multiselect(
-        "Pilih Emiten Pantauan:", 
-        options=master_tickers_clean, 
-        default=["DSSA", "CMRY", "CBDK", "AMMN", "ADRO", "BRIS", "GOTO", "ACES"]
+        "Kustom Pilih / Ketik Kode Saham Tambahan:",
+        options=master_tickers_clean,
+        default=["CBDK", "CMRY", "DSSA", "AMMN", "ADRO", "BRIS", "GOTO", "ACES", "ARNA", "ASSA"]
     )
-
-if len(saham_pilihan) > 0:
-    df_scalp = run_scalper_scanner(saham_pilihan)
     
-    if not df_scalp.empty:
-        if only_ready_to_buy:
-            df_scalp = df_scalp[df_scalp["Est. Arah"].str.contains("STRONG UP|UP MOMENTUM")]
-        
-        df_scalp = df_scalp.sort_values(by="Change %", ascending=False)
-        
-        def style_scalper(row):
-            styles = [''] * len(row)
-            arah = str(row['Est. Arah'])
-            idx_arah = row.index.get_loc('Est. Arah')
-            idx_sl = row.index.get_loc('Proteksi Stop Loss')
-            idx_tp = row.index.get_loc('Estimasi Take Profit')
+    st.markdown("---")
+    st.info(f"💡 Total database master bursa aktif saat ini: **{len(master_tickers_clean)} Emiten**.")
+
+# PROSES RENDERING DATA TABEL UTAMA
+if len(saham_pilihan) > 0:
+    with st.spinner("Sedang menembak server Yahoo Finance untuk kalkulasi indikator matematika bursa..."):
+        df_radar = run_mega_scanner(saham_pilihan)
+    
+    if not df_radar.empty:
+        # Eksekusi Filter Sesuai Request Sidebar
+        if filter_mode == "Hanya Sinyal BUY / SUPER BUY":
+            df_radar = df_radar[df_radar["Actionable"].str.contains("BUY")]
+        elif filter_mode == "Hanya Struktur Up-Trend":
+            df_radar = df_radar[df_radar["Trend"].str.contains("Up-Trend")]
             
-            if "STRONG UP" in arah:
-                styles[idx_arah] = 'background-color: #047857; color: white; font-weight: bold;'
-                styles[idx_tp] = 'color: #34D399; font-weight: bold;'
-            elif "UP MOMENTUM" in arah:
-                styles[idx_arah] = 'background-color: #065F46; color: #A7F3D0;'
-                styles[idx_tp] = 'color: #34D399;'
-            elif "DUMP RISK" in arah:
-                styles[idx_arah] = 'background-color: #991B1B; color: white; font-weight: bold;'
+        # Urutkan berdasarkan persentase kenaikan harga tertinggi
+        df_radar = df_radar.sort_values(by="Change %", ascending=False)
+        
+        # Fungsi Mewarnai Sel Tabel Secara Interaktif
+        def style_radar_rows(row):
+            styles = [''] * len(row)
+            action = str(row['Actionable'])
+            trend = str(row['Trend'])
+            
+            idx_action = row.index.get_loc('Actionable')
+            idx_trend = row.index.get_loc('Trend')
+            idx_tp = row.index.get_loc('Target TP')
+            idx_sl = row.index.get_loc('Proteksi SL')
+            
+            if "SUPER BUY" in action:
+                styles[idx_action] = 'background-color: #15803D; color: white; font-weight: bold;'
+                styles[idx_tp] = 'color: #4ADE80; font-weight: bold;'
+            elif "BUY" in action:
+                styles[idx_action] = 'background-color: #166534; color: #BBF7D0;'
+                styles[idx_tp] = 'color: #4ADE80;'
+            elif "RISK" in action:
+                styles[idx_action] = 'background-color: #991B1B; color: white; font-weight: bold;'
                 styles[idx_sl] = 'color: #F87171; font-weight: bold;'
+                
+            if "Up-Trend" in trend:
+                styles[idx_trend] = 'color: #4ADE80;'
+            elif "Down-Trend" in trend:
+                styles[idx_trend] = 'color: #F87171;'
+                
             return styles
 
-        if not df_scalp.empty:
-            styled_df = df_scalp.style.apply(style_scalper, axis=1)\
+        if not df_radar.empty:
+            styled_df = df_radar.style.apply(style_radar_rows, axis=1)\
                                       .format({
-                                          "Live Price": "Rp {:,.0f}",
+                                          "Price": "Rp {:,.0f}",
                                           "Change %": "{:+.2f}%",
-                                          "Turnover (B)": "{:,.2f} B",
-                                          "VWAP/MA Baseline": "Rp {:,.0f}",
-                                          "Stoch %K": "{:.2f}",
-                                          "Stoch %D": "{:.2f}",
-                                          "Proteksi Stop Loss": "Rp {:,.0f}",
-                                          "Estimasi Take Profit": "Rp {:,.0f}"
+                                          "Turnover (B)": "{:,.3f} B",
+                                          "EMA9 Baseline": "Rp {:,.0f}",
+                                          "MA50 Long": "Rp {:,.0f}",
+                                          "RSI": "{:.2f}",
+                                          "Proteksi SL": "Rp {:,.0f}",
+                                          "Target TP": "Rp {:,.0f}"
                                       })
             
-            st.dataframe(styled_df, use_container_width=True, height=450)
+            # Memunculkan Dataframe dengan Lebar Penuh Kontainer
+            st.dataframe(styled_df, use_container_width=True, height=500)
         else:
-            st.warning("⚠️ Tidak ada emiten yang lolos filter validasi 'Siap Buy' saat ini.")
+            st.warning("⚠️ Tidak ada emiten dari daftar Anda yang lolos kriteria penyaringan filter saat ini.")
     else:
-        st.error("Gagal menarik data pasar. Pastikan koneksi internet stabil atau tekan tombol refresh di atas.")
+        st.error("Gagal menarik respon data bursa. Pastikan server eksternal tidak sedang membatasi request IP Anda.")
+else:
+    st.info("👋 Silakan pilih atau tambahkan minimal 1 kode emiten pada kolom sidebar sebelah kiri untuk memulai radar pemindaian bursa.")
