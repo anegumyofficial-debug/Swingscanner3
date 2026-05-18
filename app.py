@@ -3,10 +3,15 @@ import pandas as pd
 import yfinance as yf
 import pandas_ta as ta
 from datetime import datetime
+import pytz  # Library untuk mengunci zona waktu
 import concurrent.futures
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Swing & Scalper Dashboard BEI", layout="wide", page_icon="📈")
+
+# Atur zona waktu lokal ke WIB
+wib_tz = pytz.timezone('Asia/Jakarta')
+wib_now = datetime.now(wib_tz)
 
 # --- 2. CUSTOM CSS UTK TAMPILAN PREMIUM ---
 st.markdown("""
@@ -66,7 +71,7 @@ def load_mega_market_tickers():
         "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN", 
         "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS", 
         "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
-        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE", "PTRO", "BRAM"
+        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE"
     ]
     return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
 
@@ -86,6 +91,8 @@ def clean_yf_dataframe(df):
 def analyze_market_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
+        
+        # Optimalisasi yfinance: Ambil 3 bulan penuh untuk kalkulasi technical indicator, otomatis cover data hari ini
         df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
         
@@ -163,7 +170,7 @@ def analyze_market_momentum(ticker):
             action_signal = "🎯 BUY (Oversold)"
             stop_loss = round(last_price * 0.95, 0)
             take_profit = round(last_price * 1.05, 0)
-        elif last_price < last_ema9 and last_k < last_d and last_rsi > 70:
+        elif last_price < last_ema9 childhood_k < last_d and last_rsi > 70:
             action_signal = "🚨 RISK (Jenuh Beli)"
             stop_loss = 0
             take_profit = 0
@@ -209,7 +216,6 @@ st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten
 # ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG -----------------
 st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
 
-# PERBAIKAN: Memasukkan parameter angka 2 ke st.columns(2) agar tidak memicu TypeError
 tf_col1, tf_col2 = st.columns(2)
 with tf_col2:
     timeframe_pilihan = st.radio(
@@ -218,7 +224,6 @@ with tf_col2:
         horizontal=True
     )
 
-# Konversi pilihan teks ke parameter Yahoo Finance (period & interval)
 tf_mapping = {
     "Hari (5 Hari)": {"period": "5d", "interval": "15m", "label": "Batas (5 Hari)"},
     "Minggu (1 Bulan)": {"period": "1mo", "interval": "1d", "label": "Batas (1 Bulan)"},
@@ -229,12 +234,11 @@ tf_mapping = {
 p_conf = tf_mapping[timeframe_pilihan]
 
 try:
-    # Tarik data multi-timeframe berdasarkan input user
     ihsg_data = yf.download("^JKSE", period=p_conf["period"], interval=p_conf["interval"], progress=False)
     ihsg_data = clean_yf_dataframe(ihsg_data)
     
-    # Tarik data harian pembanding untuk info kartu metrik terupdate saat ini
-    ihsg_live = yf.download("^JKSE", period="5d", interval="1d", progress=False)
+    # Tarik data harian pembanding 7 hari terakhir agar rujukan harga live ter-update maksimal
+    ihsg_live = yf.download("^JKSE", period="7d", interval="1d", progress=False)
     ihsg_live = clean_yf_dataframe(ihsg_live)
     
     if ihsg_data is not None and not ihsg_data.empty:
@@ -242,11 +246,9 @@ try:
         prev_ihsg = float(ihsg_live['Close'].iloc[-2])
         ihsg_change = ((current_ihsg - prev_ihsg) / prev_ihsg) * 100
         
-        # Hitung batas tertinggi & terendah sesuai range waktu yang dipilih user
         ihsg_high = float(ihsg_data['High'].max())
         ihsg_low = float(ihsg_data['Low'].min())
         
-        # PERBAIKAN: Mengisi argumen jumlah kolom agar aman
         col_i1, col_i2, col_i3, col_i4 = st.columns(4)
         with col_i1:
             st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
@@ -258,17 +260,17 @@ try:
             status_pasar = "🚨 Gawat / Bearish" if ihsg_change < -1.2 else "⏳ Konsolidasi" if abs(ihsg_change) <= 1.2 else "🚀 Bullish Kuat"
             st.metric(label="⚡ Kondisi Sentimen Harian", value=status_pasar)
         
-        # Rendering Chart Garis Historis IHSG Sesuai Filter
         st.markdown(f"**📊 Grafik Pergerakan Histori IHSG Rentang: {timeframe_pilihan}**")
         chart_df = ihsg_data[['Close']].copy()
         st.line_chart(chart_df, height=220)
         
 except Exception as e:
-    st.warning("⚠️ Gagal memuat chart IHSG multi-timeframe, silakan tunggu beberapa saat atau klik refresh.")
+    st.warning("⚠️ Gagal memuat chart IHSG, silakan klik refresh.")
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
+# Menampilkan Waktu Sinkronisasi Berdasarkan Jam WIB yang Asli
+st.write(f"⏰ Jam Sinkronisasi Terakhir: **{wib_now.strftime('%d-%m-%Y %H:%M:%S')} WIB** (Zona Waktu Terkunci Asia/Jakarta)")
 
 if st.button("🔄 Paksa Ambil Data Baru (Clear Cache)"):
     st.cache_data.clear()
@@ -284,7 +286,8 @@ with st.sidebar:
     saham_pilihan = st.multiselect(
         "Kustom Pilih / Ketik Kode Saham Tambahan:",
         options=master_tickers_clean,
-        default=["BBCA", "BBRI", "BBNI", "BBTN", "INDF", "ICBP", "CBDK", "CMRY", "AMRT", "ANTM", "KLBF", "KAEF", "INKP", "ITMG", "UNTR", "GGRM"])
+        default=["CBDK", "CMRY", "DSSA", "AMMN", "ADRO", "BRIS", "GOTO", "ACES", "ARNA", "ASSA"]
+    )
 
 # RENDERING TABEL UTAMA & METRIK PERSENTASE DANA
 if len(saham_pilihan) > 0:
