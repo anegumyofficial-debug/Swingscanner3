@@ -8,17 +8,18 @@ import concurrent.futures
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Swing & Scalper Dashboard BEI", layout="wide", page_icon="📈")
 
-# --- 2. CUSTOM CSS UTK TAMPILAN MODERN ---
+# --- 2. CUSTOM CSS UTK TAMPILAN PREMIUM ---
 st.markdown("""
     <style>
     .stApp { background-color: #0F172A; color: #E2E8F0; }
     div[data-testid="stMetricValue"] { font-size: 24px; font-weight: bold; color: #F8FAFC; }
     .main-title { color: #38BDF8; font-weight: 800; padding-bottom: 5px; }
     .sub-text { color: #94A3B8; font-size: 14px; margin-bottom: 20px; }
+    .card-dana { background-color: #1E293B; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE MASTER EMITEN SUPER LENGKAP (315+ SAHAM BEI) ---
+# --- 3. DATABASE MASTER EMITEN ---
 @st.cache_data(ttl=604800)
 def load_mega_market_tickers():
     saham_300_plus = [
@@ -80,19 +81,17 @@ def clean_yf_dataframe(df):
     df.columns = [str(col).strip() for col in df.columns]
     return df
 
-# --- 4. CORE DATA ENGINE ---
+# --- 4. ENGINE ANALISIS UTAMA ---
 def analyze_market_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
-        
-        # Tarik data historis harian
         df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
         
-        if df is None or len(df) < 5 or 'Close' not in df.columns: 
+        if df is None or len(df) < 4 or 'Close' not in df.columns: 
             return None
         
-        # Kalkulasi Indikator Teknikal Esensial
+        # Hitung Indikator Technical
         df['EMA9'] = ta.ema(df['Close'], length=9)
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
@@ -103,7 +102,6 @@ def analyze_market_momentum(ticker):
         df['STOCHk'] = stoch['STOCHk_14_3_3'] if 'STOCHk_14_3_3' in stoch.columns else 50.0
         df['STOCHd'] = stoch['STOCHd_14_3_3'] if 'STOCHd_14_3_3' in stoch.columns else 50.0
         
-        # Ambil Titik Data Terakhir
         last_price = float(df['Close'].iloc[-1])
         last_ema9 = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
         last_ema20 = float(df['EMA20'].iloc[-1]) if not pd.isna(df['EMA20'].iloc[-1]) else last_price
@@ -117,31 +115,43 @@ def analyze_market_momentum(ticker):
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
         
-        # --- 🟢 FITUR BARU: INSTITUTIONAL FLOW ENGINE ---
-        # Estimasi nilai transaksi akumulasi asing dalam satuan Miliar (B) berdasarkan volatilitas volume institusi bursa
-        base_turnover_b = (last_volume * last_price) / 1_000_000_000
-        inst_flow_sim = base_turnover_b * 0.23  # Asumsi 23% rata-rata market share institusi/asing
+        # --- KALKULASI PERSENTASE ARUS DANA ---
+        # Menggunakan rumus proksi volume & pergerakan harga harian
+        if change_pct >= 0:
+            p_masuk = 50 + (min(change_pct * 5, 45))  # Proksi dana masuk dominan saat hijau
+        else:
+            p_masuk = max(5, 50 - (abs(change_pct) * 5)) # Proksi dana masuk menciut saat merah
         
-        if change_pct < -0.8:
-            inst_flow_sim = -abs(inst_flow_sim)  # Distribusi / Outflow
-        elif change_pct > 0.8:
-            inst_flow_sim = abs(inst_flow_sim)   # Akumulasi / Inflow
-        else:
-            inst_flow_sim = inst_flow_sim * 0.1  # Netral berkala
+        # Batasi agar rasio tetap masuk akal di rentang 5% s/d 95%
+        p_masuk = max(5.0, min(95.0, p_masuk))
+        p_keluar = 100.0 - p_masuk
+        
+        # --- SIMULASI BANDARMOLOGI (INSTITUTIONAL FLOW & DISCLOSURE) ---
+        simulated_net_foreign = (last_volume * last_price * 0.12) / 1_000_000_000
+        if change_pct < -1.0:
+            simulated_net_foreign = -abs(simulated_net_foreign)
             
-        # --- 🔵 FITUR BARU: IDS DISCLOSURE ENGINE (NEGO & CORPORATE ACTIONS) ---
-        # Deteksi lonjakan volume tidak wajar di harga stagnan (indikasi crossing pasar negosiasi besar)
-        if last_volume > (last_vol_ma * 3.0) and abs(change_pct) <= 0.5:
-            ids_nego_alert = "🚨 Nego Crossing"
-            nego_est_price = round(last_price * 0.96)  # Biasanya harga pasar nego di bawah harga pasar reguler
-        elif last_volume > (last_vol_ma * 2.0) and change_pct > 4.0:
-            ids_nego_alert = "📢 Block Trade"
-            nego_est_price = int(last_price)
+        # Tentukan Status Institutional Flow
+        if simulated_net_foreign > 15.0 and change_pct > 1.0:
+            inst_flow = "🐋 Big Accum"
+        elif simulated_net_foreign > 0 and change_pct > 0:
+            inst_flow = "🐟 Small Accum"
+        elif simulated_net_foreign < -15.0 and change_pct < -1.0:
+            inst_flow = "🚨 Distribution"
         else:
-            ids_nego_alert = "Normal"
-            nego_est_price = 0
+            inst_flow = "⏳ Neutral"
             
-        # Klasifikasi Struktur Tren Utama
+        # Tentukan Status IDS Disclosure (Notasi/Keterbukaan Khusus)
+        if last_volume > (last_vol_ma * 3.0):
+            ids_disclosure = "⚠️ Unusual Vol"
+        elif abs(change_pct) > 12.0:
+            ids_disclosure = "📢 Corp Action"
+        else:
+            ids_disclosure = "✅ Normal"
+            
+        is_nego_active = "Yes" if last_volume > (last_vol_ma * 2.5) and abs(change_pct) < 0.2 else "No"
+        simulated_nego_price = round(last_price * 0.98) if is_nego_active == "Yes" else last_price
+        
         if last_price > last_ema20 and last_ema20 > last_ma50:
             trend_label = "🟩 Up-Trend"
         elif last_price < last_ema20 and last_ema20 < last_ma50:
@@ -151,16 +161,15 @@ def analyze_market_momentum(ticker):
             
         ticker_name = ticker.replace(".JK", "")
         
-        # Logika Evaluasi Sinyal Eksekusi Trading
-        if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > last_vol_ma:
+        if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.1):
             action_signal = "🔥 SUPER BUY"
             stop_loss = round(min(last_ema9, last_ema20), 0)
-            take_profit = round(last_price + ((last_price - stop_loss) * 1.6), 0)
-        elif last_k > last_d and (last_rsi < 35 or last_k < 23):
+            take_profit = round(last_price + ((last_price - stop_loss) * 1.5), 0)
+        elif last_k > last_d and (last_rsi < 35 or last_k < 25):
             action_signal = "🎯 BUY (Oversold)"
             stop_loss = round(last_price * 0.95, 0)
-            take_profit = round(last_price * 1.06, 0)
-        elif last_price < last_ema9 and last_k < last_d and last_rsi > 72:
+            take_profit = round(last_price * 1.05, 0)
+        elif last_price < last_ema9 and last_k < last_d and last_rsi > 70:
             action_signal = "🚨 RISK (Jenuh Beli)"
             stop_loss = 0
             take_profit = 0
@@ -171,16 +180,20 @@ def analyze_market_momentum(ticker):
             
         return {
             "Ticker": ticker_name,
-            "Price": int(last_price),
+            "Price": last_price,
             "Change %": round(change_pct, 2),
-            "Institutional Flow": round(inst_flow_sim, 2),
-            "IDS Disclosure": ids_nego_alert,
-            "Nego Price Est.": int(nego_est_price) if nego_est_price > 0 else "-",
-            "RSI (14)": round(last_rsi, 2),
-            "Struktur Trend": trend_label,
-            "Actionable Signal": action_signal,
-            "Proteksi SL": int(stop_loss),
-            "Target TP": int(take_profit)
+            "Net For (B)": round(simulated_net_foreign, 2),
+            "Inst Flow": inst_flow,
+            "IDS Disclosure": ids_disclosure,
+            "Dana Masuk %": round(p_masuk, 1),
+            "Dana Keluar %": round(p_keluar, 1),
+            "IDS Nego": is_nego_active,
+            "Nego Price": simulated_nego_price,
+            "RSI": round(last_rsi, 2),
+            "Trend": trend_label,
+            "Actionable": action_signal,
+            "Proteksi SL": stop_loss,
+            "Target TP": take_profit
         }
     except:
         return None
@@ -197,76 +210,90 @@ def run_mega_scanner(ticker_list):
 
 # --- 5. INTERFACE PANEL UTAMA ---
 st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
-st.markdown("<p class='sub-text'>Integrasi Pelacakan Sinyal Pasar, Institutional Flow, dan Keterbukaan Informasi IDS BEI</p>", unsafe_allow_html=True)
+st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
 st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
 
 if st.button("🔄 Paksa Ambil Data Baru (Clear Cache)"):
     st.cache_data.clear()
 
-# PANEL SIDEBAR KONTROL SENSOR
+# PANEL SIDEBAR
 with st.sidebar:
     st.header("⚙️ Panel Filter Pencarian")
-    
     filter_mode = st.radio(
         "Saring Kategori Sinyal:",
         options=["Tampilkan Semua Emiten", "Hanya Sinyal BUY / SUPER BUY", "Hanya Struktur Up-Trend"]
     )
-    
     st.markdown("---")
-    
     saham_pilihan = st.multiselect(
         "Kustom Pilih / Ketik Kode Saham Tambahan:",
         options=master_tickers_clean,
         default=["CBDK", "CMRY", "DSSA", "AMMN", "ADRO", "BRIS", "GOTO", "ACES", "ARNA", "ASSA"]
     )
-    
-    st.markdown("---")
-    st.info(f"💡 Total database master bursa aktif saat ini: **{len(master_tickers_clean)} Emiten**.")
 
-# PROSES RENDERING DATA TABEL UTAMA
+# RENDERING TABEL UTAMA & METRIK PERSENTASE DANA
 if len(saham_pilihan) > 0:
-    with st.spinner("Sedang menghitung data teknikal & pergerakan institusi asing..."):
+    with st.spinner("Sedang memproses bandarmologi dan data bursa..."):
         df_radar = run_mega_scanner(saham_pilihan)
     
     if not df_radar.empty:
+        # Menghitung Rata-rata Arus Dana Pasar dari Seluruh Saham yang Dipilih
+        avg_masuk = float(df_radar["Dana Masuk %"].mean())
+        avg_keluar = 100.0 - avg_masuk
+        
+        # TAMPILAN MONITOR RASIO PERSENTASE MASUK & KELUAR DI ATAS TABEL
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='card-dana'>
+            <div style='display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px;'>
+                <span style='color: #4ADE80;'>🟢 Rata-rata Dana Masuk: {avg_masuk:.1f}%</span>
+                <span style='color: #F87171;'>🔴 Rata-rata Dana Keluar: {avg_keluar:.1f}%</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.progress(avg_masuk / 100.0)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
         if filter_mode == "Hanya Sinyal BUY / SUPER BUY":
-            df_radar = df_radar[df_radar["Actionable Signal"].str.contains("BUY")]
+            df_radar = df_radar[df_radar["Actionable"].str.contains("BUY")]
         elif filter_mode == "Hanya Struktur Up-Trend":
-            df_radar = df_radar[df_radar["Struktur Trend"].str.contains("Up-Trend")]
+            df_radar = df_radar[df_radar["Trend"].str.contains("Up-Trend")]
             
         df_radar = df_radar.sort_values(by="Change %", ascending=False)
         
-        # Fungsi styling baris dinamis untuk indikator visual
+        # Fungsi styling baris dan warna teks data baru
         def style_radar_rows(row):
             styles = [''] * len(row)
-            action = str(row['Actionable Signal'])
-            trend = str(row['Struktur Trend'])
-            ids = str(row['IDS Disclosure'])
+            action = str(row['Actionable'])
+            trend = str(row['Trend'])
+            flow = str(row['Inst Flow'])
+            disc = str(row['IDS Disclosure'])
             
-            idx_action = row.index.get_loc('Actionable Signal')
-            idx_trend = row.index.get_loc('Struktur Trend')
-            idx_tp = row.index.get_loc('Target TP')
-            idx_sl = row.index.get_loc('Proteksi SL')
-            idx_ids = row.index.get_loc('IDS Disclosure')
+            idx_action = row.index.get_loc('Actionable')
+            idx_trend = row.index.get_loc('Trend')
+            idx_flow = row.index.get_loc('Inst Flow')
+            idx_disc = row.index.get_loc('IDS Disclosure')
+            idx_masuk = row.index.get_loc('Dana Masuk %')
+            idx_keluar = row.index.get_loc('Dana Keluar %')
+            
+            # Dana masuk vs keluar color indicator
+            styles[idx_masuk] = 'color: #4ADE80; font-weight: bold;'
+            styles[idx_keluar] = 'color: #F87171;'
             
             if "SUPER BUY" in action:
                 styles[idx_action] = 'background-color: #15803D; color: white; font-weight: bold;'
-                styles[idx_tp] = 'color: #4ADE80; font-weight: bold;'
             elif "BUY" in action:
                 styles[idx_action] = 'background-color: #166534; color: #BBF7D0;'
-                styles[idx_tp] = 'color: #4ADE80;'
-            elif "RISK" in action:
-                styles[idx_action] = 'background-color: #991B1B; color: white; font-weight: bold;'
-                styles[idx_sl] = 'color: #F87171; font-weight: bold;'
                 
-            if "Up-Trend" in trend:
-                styles[idx_trend] = 'color: #4ADE80;'
-            elif "Down-Trend" in trend:
-                styles[idx_trend] = 'color: #F87171;'
+            if "Up-Trend" in trend or "Accum" in flow:
+                if "Up-Trend" in trend: styles[idx_trend] = 'color: #4ADE80;'
+                if "Accum" in flow: styles[idx_flow] = 'color: #4ADE80; font-weight: bold;'
+            elif "Down-Trend" in trend or "Distribution" in flow:
+                if "Down-Trend" in trend: styles[idx_trend] = 'color: #F87171;'
+                if "Distribution" in flow: styles[idx_flow] = 'color: #F87171; font-weight: bold;'
                 
-            if "Normal" not in ids:
-                styles[idx_ids] = 'background-color: #1E3A8A; color: #93C5FD; font-weight: bold;'
+            if "Unusual" in disc or "Action" in disc:
+                styles[idx_disc] = 'color: #FBBF24; font-weight: bold;'
                 
             return styles
 
@@ -275,16 +302,17 @@ if len(saham_pilihan) > 0:
                                       .format({
                                           "Price": "Rp {:,.0f}",
                                           "Change %": "{:+.2f}%",
-                                          "Institutional Flow": "{:+.2f} B",
-                                          "RSI (14)": "{:.2f}",
+                                          "Net For (B)": "{:+.2f} B",
+                                          "Dana Masuk %": "{:.1f}%",
+                                          "Dana Keluar %": "{:.1f}%",
+                                          "Nego Price": "Rp {:,.0f}",
+                                          "RSI": "{:.2f}",
                                           "Proteksi SL": "Rp {:,.0f}",
                                           "Target TP": "Rp {:,.0f}"
                                       })
             
             st.dataframe(styled_df, use_container_width=True, height=520)
         else:
-            st.warning("⚠️ Tidak ada emiten dari daftar Anda yang lolos kriteria penyaringan filter saat ini.")
-    else:
-        st.error("Gagal menarik respon data bursa. Pastikan koneksi atau kuota harian API tidak dibatasi.")
+            st.warning("⚠️ Tidak ada emiten dari daftar Anda yang lolos kriteria filter saat ini.")
 else:
-    st.info("👋 Silakan pilih atau tambahkan kode emiten pada panel sidebar untuk memulai analisis radar.")
+    st.info("👋 Silakan pilih atau tambahkan minimal 1 kode emiten pada kolom sidebar untuk memulai radar.")
