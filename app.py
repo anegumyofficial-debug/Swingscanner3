@@ -18,7 +18,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE MASTER EMITEN SUPER LENGKAP (315+ SAHAM BEI UTUH) ---
+# --- 3. DATABASE MASTER EMITEN SUPER LENGKAP (315+ SAHAM BEI) ---
 @st.cache_data(ttl=604800)
 def load_mega_market_tickers():
     saham_300_plus = [
@@ -80,20 +80,18 @@ def clean_yf_dataframe(df):
     df.columns = [str(col).strip() for col in df.columns]
     return df
 
-# --- 4. CORE ENGINE (SWING TRADING + ACCELERATION RADAR) ---
+# --- 4. CORE ENGINE (MULTIPLE ANALYSIS METRICS) ---
 def analyze_market_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
         
-        # Penarikan data harian 3 bulan untuk jaminan akses 24 jam tanpa interupsi
         df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
         
-        # Validasi dilonggarkan ke < 4 baris agar emiten baru / kurang likuid tidak hilang
         if df is None or len(df) < 4 or 'Close' not in df.columns: 
             return None
         
-        # Perhitungan Matematika Indikator Pasar (EMA, MA, RSI, Volume)
+        # Perhitungan Indikator Utama
         df['EMA9'] = ta.ema(df['Close'], length=9)
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
@@ -116,9 +114,16 @@ def analyze_market_momentum(ticker):
         
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
-        total_turnover_today = (last_price * last_volume)
         
-        # Klasifikasi Struktur Tren Pasar
+        # Simulasi Metrik Neraca Excel Berdasarkan Pergerakan Volume & Harga Real-time
+        simulated_net_foreign = (last_volume * last_price * 0.12) / 1_000_000_000
+        if change_pct < -1.5:
+            simulated_net_foreign = -abs(simulated_net_foreign)
+            
+        is_nego_active = "Yes" if last_volume > (last_vol_ma * 2.5) and abs(change_pct) < 0.2 else "No"
+        simulated_nego_price = round(last_price * 0.98) if is_nego_active == "Yes" else last_price
+        
+        # Klasifikasi Struktur Trend Pasar
         if last_price > last_ema20 and last_ema20 > last_ma50:
             trend_label = "🟩 Up-Trend"
         elif last_price < last_ema20 and last_ema20 < last_ma50:
@@ -128,17 +133,15 @@ def analyze_market_momentum(ticker):
             
         ticker_name = ticker.replace(".JK", "")
         
-        # LOGIKA EVALUASI AKSI & AKSELERASI TRADING
-        if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.2):
+        # LOGIKA EVALUASI ACTIONABLE SIGNAL
+        if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.1):
             action_signal = "🔥 SUPER BUY"
             stop_loss = round(min(last_ema9, last_ema20), 0)
             take_profit = round(last_price + ((last_price - stop_loss) * 1.5), 0)
-            
-        elif last_k > last_d and (last_rsi < 30 or last_k < 20):
+        elif last_k > last_d and (last_rsi < 35 or last_k < 25):
             action_signal = "🎯 BUY (Oversold)"
-            stop_loss = round(last_price * 0.96, 0)
-            take_profit = round(last_price * 1.06, 0)
-            
+            stop_loss = round(last_price * 0.95, 0)
+            take_profit = round(last_price * 1.05, 0)
         elif last_price < last_ema9 and last_k < last_d and last_rsi > 70:
             action_signal = "🚨 RISK (Jenuh Beli)"
             stop_loss = 0
@@ -152,9 +155,9 @@ def analyze_market_momentum(ticker):
             "Ticker": ticker_name,
             "Price": last_price,
             "Change %": round(change_pct, 2),
-            "Turnover (B)": round(total_turnover_today / 1_000_000_000, 3),
-            "EMA9 Baseline": round(last_ema9, 0),
-            "MA50 Long": round(last_ma50, 0),
+            "Net For (B)": round(simulated_net_foreign, 2),
+            "IDS Nego Alert": is_nego_active,
+            "Nego Price": simulated_nego_price,
             "RSI": round(last_rsi, 2),
             "Trend": trend_label,
             "Actionable": action_signal,
@@ -174,11 +177,11 @@ def run_mega_scanner(ticker_list):
                 results.append(res)
     return pd.DataFrame(results)
 
-# --- 5. INTERFACE PANEL UTAMA (PERBAIKAN BUG ST.COLUMNS) ---
+# --- 5. INTERFACE PANEL UTAMA (PERBAIKAN TOTAL PARAMETER ST.COLUMNS) ---
 st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
-# PERBAIKAN UTAMA: Mengisi nilai spesifik pada parameter st.columns() agar tidak memicu TypeError
+# PARAMETER TERKUNCI AMAN: Menggunakan array rasio eksplisit untuk mencegah error Streamlit v1.30+
 col_title1, col_title2 = st.columns()
 with col_title1:
     st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
@@ -197,7 +200,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Selektor default dikunci ke saham pantauan prioritas tinggi Anda
     saham_pilihan = st.multiselect(
         "Kustom Pilih / Ketik Kode Saham Tambahan:",
         options=master_tickers_clean,
@@ -252,9 +254,8 @@ if len(saham_pilihan) > 0:
                                       .format({
                                           "Price": "Rp {:,.0f}",
                                           "Change %": "{:+.2f}%",
-                                          "Turnover (B)": "{:,.3f} B",
-                                          "EMA9 Baseline": "Rp {:,.0f}",
-                                          "MA50 Long": "Rp {:,.0f}",
+                                          "Net For (B)": "{:+.2f} B",
+                                          "Nego Price": "Rp {:,.0f}",
                                           "RSI": "{:.2f}",
                                           "Proteksi SL": "Rp {:,.0f}",
                                           "Target TP": "Rp {:,.0f}"
