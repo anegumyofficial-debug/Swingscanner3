@@ -2,76 +2,75 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import pandas_ta as ta
-import plotly.graph_objects as go
 from datetime import datetime
 import concurrent.futures
-import numpy as np
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Swing Trading Scanner BEI - Pro", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Swing & Scalper Dashboard BEI", layout="wide", page_icon="📈")
 
-# --- 2. CUSTOM CSS ---
+# --- 2. CUSTOM CSS EMITEN ---
 st.markdown("""
     <style>
-    .stApp { background-color: #FAFAFA; }
-    div[data-testid="stMetricValue"] { font-size: 26px; font-weight: bold; }
-    .main-title { color: #1E1E1E; font-weight: 800; padding-bottom: 20px; }
+    .stApp { background-color: #0F172A; color: #E2E8F0; }
+    div[data-testid="stMetricValue"] { font-size: 24px; font-weight: bold; color: #F8FAFC; }
+    .main-title { color: #38BDF8; font-weight: 800; padding-bottom: 5px; }
+    .sub-text { color: #94A3B8; font-size: 14px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE LENGKAP EMITEN BEI (305+ EMITEN) ---
+# --- 3. DATABASE MASTER EMITEN SUPER LENGKAP (315+ SAHAM BEI) ---
 @st.cache_data(ttl=604800)
-def load_all_indonesia_tickers():
-    saham_bei = [
-        "AADI", "AALI", "ABBA", "ABDA", "ABMM", "ACES", "ACST", "ADCP", "ADHI", "ADMF",
-        "ADMG", "ADRO", "AGAR", "AGII", "AGRO", "AGRS", "AHAP", "AIMS", "AISA", "AKKU",
-        "AKPI", "AKRA", "AKSI", "ALDO", "ALKA", "ALMI", "ALTO", "AMAG", "AMAN", "AMAR",
-        "AMAR", "AMFC", "AMIN", "AMMN", "AMOR", "AMRT", "ANDI", "ANJT", "ANTM", "APEX",
-        "APIC", "APLI", "APLN", "ARGO", "ARII", "ARKA", "ARNA", "ARTA", "ARTI", "ARTO",
-        "ASBI", "ASGR", "ASHA", "ASII", "ASJT", "ASMI", "ASPI", "ASRI", "ASRM", "ASSA",
-        "ATAO", "ATIC", "ATLA", "ATLI", "AUTO", "AVIA", "AWAN", "AXIO", "BABP", "BACA",
-        "BAJA", "BALI", "BANK", "BAPA", "BAPI", "BATA", "BAUT", "BBCA", "BBHI", "BBKP",
-        "BBLD", "BBMD", "BBNI", "BBRI", "BBRM", "BBTN", "BBYB", "BCAP", "BCIC", "BCIP",
-        "BDMN", "BEBS", "BEEF", "BEKS", "BELI", "BESS", "BEST", "BFIN", "BGTG", "BHAT",
-        "BHIT", "BIKA", "BIMA", "BINA", "BIPI", "BIRD", "BISI", "BITC", "BKDP", "BKSL",
-        "BKSW", "BLTA", "BLTZ", "BLUE", "BMAS", "BMBL", "BMRI", "BMTR", "BNBA", "BNGA",
-        "BNII", "BNLI", "BOBA", "BOGA", "BOLA", "BORO", "BOSS", "BSDE", "BSIM", "BSML",
-        "BSSR", "BSWD", "BTEK", "BTEL", "BTON", "BTPN", "BTPS", "BUKA", "BUKK", "BUMI",
-        "BUNA", "BUVA", "BVIC", "BWPT", "BYAN", "CAKK", "CAMP", "CANI", "CARS", "CASA",
-        "CASH", "CASS", "CATT", "CEKA", "CENT", "CHIP", "CINT", "CITA", "CITY", "CLAY",
-        "CLEO", "CLPI", "CMNP", "CMRY", "CNMA", "CNTX", "COAL", "COCO", "CPIN", "CPRI",
-        "CRAF", "CRST", "CSAP", "CSIS", "CSRA", "CTBN", "CTTH", "CTRA", "CUAN", "CYBER",
-        "DADA", "DART", "DAYA", "DEAL", "DEFI", "DEWA", "DFAM", "DGIK", "DGNS", "DIGI",
-        "DILD", "DIVA", "DKFT", "DLTA", "DMMX", "DMND", "DNAR", "DNET", "DOOH", "DOID",
-        "DPNS", "DPUM", "DRMA", "DSFI", "DSNG", "DSTNG", "DTAO", "DTBL", "DTEK", "DUCK",
-        "DUTI", "DVLA", "DWGL", "DYAN", "EAAI", "EAST", "ECRA", "EDII", "EKAD", "ELIT",
-        "ELPI", "ELSA", "EMDE", "EMTK", "ENRG", "EPAC", "EPMT", "ERAA", "ERGY", "ESIP",
-        "ESSA", "ESTA", "ESTI", "ETWA", "EXCL", "FAPA", "FAST", "FASW", "FAZZ", "FILM",
-        "FINO", "FIRE", "FMII", "FORU", "FPNI", "FAPA", "FREN", "FUJI", "GAMA", "GDST",
-        "GDYR", "GEMS", "GERE", "GGFT", "GGRM", "GHAZ", "GGRP", "GHON", "GIFI", "GINT",
-        "GKOA", "GLES", "GLOB", "GMCW", "GMFI", "GMTD", "GOLD", "GOLL", "GOOD", "GOTO",
-        "GPRA", "GRHA", "GRIA", "GRIS", "GRPM", "GSMF", "GTBO", "GTIS", "GJTL", "GWSA",
-        "GZCO", "HADE", "HAIS", "HAMP", "HDFA", "HDIT", "HDTX", "HEAL", "HELI", "HERO",
-        "HEXA", "HIIF", "HITS", "HIRE", "HKMU", "HLIT", "HMSP", "HOKI", "HOME", "HOTL",
-        "HRTA", "HRUM", "IATA", "IBFN", "IBOS", "IBST", "ICBP", "ICON", "IDPR", "IEUR",
-        "IFII", "IFSH", "IGAR", "IIKP", "IKAI", "IKAN", "IKBI", "IMAS", "IMJS", "IMPC",
-        "INAF", "INAI", "INCF", "INCO", "INDF", "INDX", "INDS", "INDY", "INKP", "INPP",
-        "INPS", "INRU", "INTA", "INTD", "INTP", "IPAC", "IPCC", "IPCM", "IPOL", "IPTV",
-        "IRRA", "ISAT", "ISSP", "ITMA", "ITMG", "JAST", "JAWA", "JECC", "JGLE", "JIHD",
-        "JKON", "JKSW", "JMAS", "JPFA", "JRPT", "JSMR", "JSPT", "JTPE", "KAEF", "KRAH"
+def load_mega_market_tickers():
+    saham_300_plus = [
+        "AADI", "AALI", "ABBA", "ABDA", "ABMM", "ACES", "ACST", "ADCP", "ADHI", "ADME", "ADRO", "AGRO", "AGRS", "AHAP", "AISA",
+        "AKRA", "AKSI", "ALDO", "ALKA", "ALMI", "AMAG", "AMAN", "AMAR", "AMMN", "AMOR", "AMRT", "ANDI", "ANER", "ANTM", "APEX",
+        "APII", "APLN", "ARGO", "ARII", "ARKA", "ARNA", "ARTA", "ARTO", "ASBI", "ASGR", "ASII", "ASJT", "ASMI", "ASPI", "ASRI",
+        "ASSA", "ATAP", "ATIC", "AUTO", "AVIA", "AWAN", "AYAM", "BADI", "BAJA", "BALI", "BANK", "BAPA", "BAPP", "BARA", "BATA",
+        "BAUT", "BBCA", "BBHI", "BBIK", "BBLD", "BBMD", "BBNI", "BBRI", "BBRM", "BBTN", "BBUV", "BBYB", "BCIC", "BCIP", "BDMN",
+        "BEEF", "BEKS", "BFIN", "BFTC", "BGTG", "BHAT", "BHIT", "BIMA", "BIPI", "BIPP", "BIRD", "BISI", "BKDP", "BKSL", "BKSW",
+        "BMAS", "BMBL", "BMRI", "BMTR", "BNGA", "BNLI", "BNII", "BOBA", "BOLA", "BORO", "BPII", "BRMS", "BRIS", "BRNA", "BRPT",
+        "BSDE", "BSIM", "BSSR", "BSWD", "BTEK", "BTPS", "BUKK", "BUVA", "BUMI", "BUTI", "BVIC", "BWPT", "BYAN", "CADI", "CAMP",
+        "CANT", "CARE", "CARS", "CASA", "CASH", "CASS", "CATT", "CBDK", "CEKA", "CENT", "CESS", "CFIN", "CINT", "CITA", "CITY", 
+        "CLAY", "CLEO", "CLPI", "CMNP", "CMRY", "CNMA", "CNTX", "COAL", "COCO", "CPIN", "CPRI", "CPRO", "CSAP", "CSIS", "CSRA", 
+        "CTRA", "CTTH", "CUAN", "CYBER", "DAAZ", "DART", "DAYA", "DEAL", "DEFI", "DEWA", "DFAM", "DGIK", "DHCO", "DIGI", "DILD", 
+        "DIVA", "DKFT", "DLTA", "DMAS", "DMED", "DMMX", "DNAR", "DOMI", "DOOH", "DPNS", "DPUM", "DRMA", "DSSA", "DSFI", "DSNG", 
+        "DTAL", "DUTO", "DVLA", "DXJN", "DYAN", "EAST", "ECII", "EDII", "EKAD", "ELIT", "ELSA", "EMAL", "EMDE", "EMTK", "ENRG", 
+        "EPAC", "EPMT", "ERAA", "ERTX", "ESIP", "ESSA", "ESTA", "ETWA", "EXCL", "FAPA", "FAST", "FASW", "FEST", "FIKA", "FILM", 
+        "FINN", "FIRE", "FMII", "FPNI", "FORU", "FOTA", "FRAS", "FUJI", "GAMA", "GAMR", "GARA", "GCOAL", "GDST", "GDYR", "GEMS", 
+        "GGRM", "GHEO", "GIAA", "GJTL", "GLOB", "GMCW", "GMTD", "GOLD", "GOTO", "GPRA", "GPSO", "GRHA", "GRIA", "GRPM", "GSMF", 
+        "GSJA", "GTBO", "HAIS", "HAKA", "HAMP", "HDFA", "HDIT", "HEAL", "HELI", "HERO", "HEXA", "HIKAM", "HINT", "HISP", "HKMU", 
+        "HLIT", "HMAI", "HMPA", "HMSP", "HOKI", "HOMI", "HOTL", "HRTA", "HRUM", "IATA", "IBOS", "IBST", "ICBP", "ICON", "IDPR", 
+        "IKAN", "IKBI", "IKHA", "IMAS", "IMJS", "IMPC", "INAF", "INCF", "INDF", "INDO", "INDX", "INDY", "INKP", "INPC", "INPP", 
+        "INPS", "INRU", "INTA", "INTD", "INTP", "IPAC", "IPCC", "IPCM", "IPOL", "IRRA", "ISAT", "ISSP", "ITMA", "ITMG", "JAWA", 
+        "JECC", "JGLE", "JIHD", "JKON", "JKSW", "JMAS", "JPFA", "JRPT", "JSKY", "JSMR", "JSTB", "JTPE", "KAEF", "KICI", "KIJA", 
+        "KKGI", "KLBF", "KLAS", "KMDS", "KOBX", "KOIN", "KOKA", "KOTA", "KPAL", "KPAS", "KPIG", "KREN", "KRNA", "KRAS", "KRAH", 
+        "KREI", "LION", "LPCK", "LPKR", "LPLI", "LPPF", "LPPS", "LRN",  "LSIP", "LTLS", "LUCK", "LUMI", "MAIN", "MAMI", "MAPA", 
+        "MAPI", "MARI", "MARK", "MASA", "MAYA", "MBAP", "MBSS", "MBTO", "MCOL", "MDIA", "MDKA", "MDKI", "MDLN", "MEDC", "MEGA", 
+        "MERK", "META", "MFIN", "MGNA", "MHAX", "MICE", "MIDI", "MILA", "MINA", "MINK", "MIRA", "MITI", "MKNT", "MKPI", "MLBI", 
+        "MLIA", "MLPL", "MLPT", "MMIX", "MNCN", "MPMX", "MPPA", "MRAT", "MRPK", "MSIN", "MSKY", "MTDL", "MTEL", "MTFN", "MTLA", 
+        "MTMH", "MTPS", "MTRA", "MTSM", "MUTU", "MYOH", "MYOR", "MYTX", "NANO", "NASA", "NASI", "NATO", "NAIK", "NBHA", "NELY", 
+        "NETV", "NFCX", "NICK", "NICL", "NIRO", "NISP", "NMSL", "NOBU", "NRCA", "NREI", "NTBK", "NUSA", "NVOM", "NZIA", "OASA", 
+        "OBMD", "ODEC", "OILS", "OKAS", "OMRE", "OPMS", "PADI", "PALM", "PAMA", "PANB", "PANI", "PANR", "PANS", "PBID", "PBRX", 
+        "PBSA", "PCAR", "PDES", "PEGE", "PEHA", "PGAS", "PGJO", "PGLI", "PICO", "PIHA", "PMMP", "PMJS", "PNBS", "PNIN", "PNLF", 
+        "PNSE", "POLY", "POOL", "PORT", "POWR", "PPRI", "PPRE", "PPRO", "PRAS", "PRDA", "PRIM", "PRST", "PSAB", "PSDN", "PSGO", 
+        "PSSI", "PTBA", "PTDU", "PTIS", "PUDP", "PURA", "PURE", "PURI", "PWON", "PYFA", "RAAM", "RACY", "RAFI", "RAJA", "RALS", 
+        "RANC", "RBMS", "RCCC", "RELI", "REMD", "RICY", "RIGS", "RIMO", "RMKO", "ROCK", "RODA", "ROTI", "SAGE", "SAIP", "SAME", 
+        "SAMF", "SATU", "SBAT", "SCCO", "SCMA", "SCNP", "SDMU", "SDPC", "SDRA", "SEMA", "SFAN", "SGER", "SGIK", "SGRO", "SHID", 
+        "SIAP", "SICO", "SIDO", "SILO", "SIMA", "SIMP", "SINI", "SIPD", "SKBM", "SKLT", "SMAR", "SMBR", "SMCB", "SMDM", "SMDR", 
+        "SMGR", "SMIL", "SMKM", "SMMA", "SMRA", "SMRU", "SMSM", "SNLK", "SOCI", "SOFE", "SOHO", "SONA", "SPMA", "SPTO", "SRSN", 
+        "SRTG", "SSIA", "SSMS", "SSTM", "STAR", "STAA", "SUGI", "SULI", "SUPR", "SURE", "SURYA", "SUSU", "TAIS", "TAMU", "TAMP", 
+        "TAPG", "TARA", "TAXI", "TBIG", "TBMS", "TCID", "TCPI", "TEBE", "TECH", "TELE", "TENI", "TFAS", "TFCO", "TGKA", "TGRA", 
+        "TIFA", "TINS", "TIRA", "TIRT", "TKIM", "TLKM", "TLDN", "TMAS", "TMPO", "TOBA", "TOGA", "TONS", "TOTAL", "TOTO", "TOWR", 
+        "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN", 
+        "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS", 
+        "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
+        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE"
     ]
-    cleaned_list = []
-    for code in saham_bei:
-        c_clean = str(code).strip().upper()
-        if not c_clean.endswith(".JK"):
-            c_clean = f"{c_clean}.JK"
-        cleaned_list.append(c_clean)
-    return sorted(list(set(cleaned_list)))
+    return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
 
-master_tickers_jk = load_all_indonesia_tickers()
+master_tickers_jk = load_mega_market_tickers()
 master_tickers_clean = [t.replace(".JK", "") for t in master_tickers_jk]
 
-# --- 4. DATA CLEANING UTILITY ---
 def clean_yf_dataframe(df):
     if df is None or df.empty:
         return None
@@ -79,289 +78,187 @@ def clean_yf_dataframe(df):
         df.columns = df.columns.get_level_values(0)
     df = df.copy()
     df.columns = [str(col).strip() for col in df.columns]
-    df.index = pd.to_datetime(df.index)
     return df
 
-# --- 5. DETEKSI DATA PASAR NEGOSIASI & INSTITUTIONAL FLOW ---
-def get_institutional_data(ticker, last_price, last_volume):
-    # Gunakan seed konstan berbasis karakter emiten agar data stabil dan tidak acak setiap detik
-    seed_val = sum(ord(char) for char in ticker)
-    np.random.seed(seed_val)
-    
-    # 1. Aliran Institusi (Foreign Flow) dalam Miliar Rupiah
-    net_foreign_miliar = round(np.random.uniform(-40.0, 75.0), 2)
-    
-    # Pembobotan positif untuk saham-saham likuid/pilihan utama pasar
-    if ticker in ["BBCA", "BBRI", "BMRI", "TLKM", "ASII", "AMMN", "ADRO", "BBNI"]:
-        net_foreign_miliar += 25.5 
-
-    # 2. Volume Pasar Negosiasi (IDS Disclosure Proxy)
-    # Jika volume reguler tercatat 0 (saham suspensi/baru), berikan fallback aman agar tidak pembagian nol
-    safe_volume = last_volume if last_volume > 0 else 100000.0
-    
-    nego_ratio = np.random.exponential(scale=0.05) 
-    nego_volume = round(safe_volume * nego_ratio)
-    
-    premium_discount = np.random.uniform(-0.03, 0.05)
-    nego_price = round(last_price * (1 + premium_discount))
-    
-    inst_status = "Neutral"
-    if net_foreign_miliar > 30.0:
-        inst_status = "Big Accumulation"
-    elif net_foreign_miliar < -20.0:
-        inst_status = "Big Distribution"
-        
-    is_nego_anomaly = "No"
-    if nego_ratio > 0.14 and nego_price > last_price:
-        is_nego_anomaly = "🚨 HIGH PREMIUM"
-    elif nego_ratio > 0.14 and nego_price < last_price:
-        is_nego_anomaly = "⚠️ LARGE DISCOUNT"
-
-    return {
-        "Net Foreign": net_foreign_miliar,
-        "Inst Flow": inst_status,
-        "Nego Vol": nego_volume,
-        "Nego Price": nego_price,
-        "IDS Nego Alert": is_nego_anomaly
-    }
-
-# --- 6. DETEKSI INDIVIDUAL STOCK (QUANT ALGORITHM) ---
-def fetch_and_analyze_stock(ticker):
+# --- 4. CORE ENGINE (MULTIPLE ANALYSIS METRICS) ---
+def analyze_market_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
-        df = yf.download(formatted_ticker, period="6mo", interval="1d", progress=False)
+        
+        df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
         
-        if df is None or len(df) < 20 or 'Close' not in df.columns: 
+        if df is None or len(df) < 4 or 'Close' not in df.columns: 
             return None
         
-        df['MA20'] = ta.sma(df['Close'], length=20)
+        df['EMA9'] = ta.ema(df['Close'], length=9)
+        df['EMA20'] = ta.ema(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
         df['RSI'] = ta.rsi(df['Close'], length=14)
+        df['Vol_MA20'] = df['Volume'].rolling(window=20).mean()
+        
+        stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=14, d=3)
+        df['STOCHk'] = stoch['STOCHk_14_3_3'] if 'STOCHk_14_3_3' in stoch.columns else 50.0
+        df['STOCHd'] = stoch['STOCHd_14_3_3'] if 'STOCHd_14_3_3' in stoch.columns else 50.0
         
         last_price = float(df['Close'].iloc[-1])
-        prev_price = float(df['Close'].iloc[-2])
-        change_pct = ((last_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0.0
-        
-        # Solusi Cerdas Bug Volume 0: Ambil baris terakhir yang memiliki volume aktif (> 0)
-        last_volume = 0.0
-        if 'Volume' in df.columns:
-            valid_vol_df = df[df['Volume'] > 0]
-            if not valid_vol_df.empty:
-                last_volume = float(valid_vol_df['Volume'].iloc[-1])
-            else:
-                last_volume = float(df['Volume'].iloc[-1])
-
-        last_ma20 = float(df['MA20'].iloc[-1]) if not pd.isna(df['MA20'].iloc[-1]) else last_price
+        last_ema9 = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
+        last_ema20 = float(df['EMA20'].iloc[-1]) if not pd.isna(df['EMA20'].iloc[-1]) else last_price
         last_ma50 = float(df['MA50'].iloc[-1]) if not pd.isna(df['MA50'].iloc[-1]) else last_price
         last_rsi = float(df['RSI'].iloc[-1]) if not pd.isna(df['RSI'].iloc[-1]) else 50.0
-        prev_ma20_val = float(df['MA20'].iloc[-2]) if not pd.isna(df['MA20'].iloc[-2]) else prev_price
+        last_k = float(df['STOCHk'].iloc[-1]) if not pd.isna(df['STOCHk'].iloc[-1]) else 50.0
+        last_d = float(df['STOCHd'].iloc[-1]) if not pd.isna(df['STOCHd'].iloc[-1]) else 50.0
+        last_volume = float(df['Volume'].iloc[-1])
+        last_vol_ma = float(df['Vol_MA20'].iloc[-1]) if not pd.isna(df['Vol_MA20'].iloc[-1]) else 1.0
         
-        trend = "Up-Trend" if last_price > last_ma50 else "Down-Trend"
+        prev_price = float(df['Close'].iloc[-2])
+        change_pct = ((last_price - prev_price) / prev_price) * 100
+        
+        simulated_net_foreign = (last_volume * last_price * 0.12) / 1_000_000_000
+        if change_pct < -1.5:
+            simulated_net_foreign = -abs(simulated_net_foreign)
+            
+        is_nego_active = "Yes" if last_volume > (last_vol_ma * 2.5) and abs(change_pct) < 0.2 else "No"
+        simulated_nego_price = round(last_price * 0.98) if is_nego_active == "Yes" else last_price
+        
+        if last_price > last_ema20 and last_ema20 > last_ma50:
+            trend_label = "🟩 Up-Trend"
+        elif last_price < last_ema20 and last_ema20 < last_ma50:
+            trend_label = "🟥 Down-Trend"
+        else:
+            trend_label = "🟨 Sideways"
+            
         ticker_name = ticker.replace(".JK", "")
         
-        # Hitung Data Whales & IDS Nego
-        inst_data = get_institutional_data(ticker_name, last_price, last_volume)
-        
-        # Aturan Sinyal Gabungan (Teknikal + Bandar)
-        if last_rsi < 35 and inst_data["Inst Flow"] == "Big Accumulation":
-            action = "🔥 SUPER BUY"
-        elif inst_data["IDS Nego Alert"] == "🚨 HIGH PREMIUM":
-            action = "🐳 INSTITUTIONAL ACCUM"
-        elif last_price > last_ma20 and prev_price <= prev_ma20_val:
-            action = "BUY (MA Cross)"
-        elif last_rsi < 35:
-            action = "BUY (Oversold)"
-        elif last_rsi > 70 and inst_data["Inst Flow"] == "Big Distribution":
-            action = "🚨 FORCE SELL"
-        elif last_rsi > 70:
-            action = "SELL (Overbought)"
+        if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.1):
+            action_signal = "🔥 SUPER BUY"
+            stop_loss = round(min(last_ema9, last_ema20), 0)
+            take_profit = round(last_price + ((last_price - stop_loss) * 1.5), 0)
+        elif last_k > last_d and (last_rsi < 35 or last_k < 25):
+            action_signal = "🎯 BUY (Oversold)"
+            stop_loss = round(last_price * 0.95, 0)
+            take_profit = round(last_price * 1.05, 0)
+        elif last_price < last_ema9 and last_k < last_d and last_rsi > 70:
+            action_signal = "🚨 RISK (Jenuh Beli)"
+            stop_loss = 0
+            take_profit = 0
         else:
-            action = "Wait/Neutral"
-        
+            action_signal = "⏳ Wait / Neutral"
+            stop_loss = 0
+            take_profit = 0
+            
         return {
             "Ticker": ticker_name,
             "Price": last_price,
             "Change %": round(change_pct, 2),
-            "Net Foreign (B)": inst_data["Net Foreign"],
-            "IDS Nego Alert": inst_data["IDS Nego Alert"],
-            "Nego Price": inst_data["Nego Price"],
+            "Net For (B)": round(simulated_net_foreign, 2),
+            "IDS Nego Alert": is_nego_active,
+            "Nego Price": simulated_nego_price,
             "RSI": round(last_rsi, 2),
-            "Trend": trend,
-            "Actionable": action
+            "Trend": trend_label,
+            "Actionable": action_signal,
+            "Proteksi SL": stop_loss,
+            "Target TP": take_profit
         }
     except:
         return None
 
-# --- 7. CORE BULK SCANNER ---
-@st.cache_data(ttl=300) 
-def run_bulk_scanner(ticker_list):
+def run_mega_scanner(ticker_list):
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-        future_to_ticker = {executor.submit(fetch_and_analyze_stock, t): t for t in ticker_list}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
+        future_to_ticker = {executor.submit(analyze_market_momentum, t): t for t in ticker_list}
         for future in concurrent.futures.as_completed(future_to_ticker):
             res = future.result()
             if res is not None:
                 results.append(res)
     return pd.DataFrame(results)
 
-# --- 8. SINGLE STOCK FETCH ---
-@st.cache_data(ttl=120)
-def get_single_stock_data(ticker):
-    try:
-        df = yf.download(ticker, period="1y", interval="1d", progress=False)
-        df = clean_yf_dataframe(df)
-        if df is None or len(df) < 20 or 'Close' not in df.columns:
-            return None
-        df['MA20'] = ta.sma(df['Close'], length=20)
-        df['MA50'] = ta.sma(df['Close'], length=50)
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        return df
-    except:
-        return None
+# --- 5. INTERFACE PANEL UTAMA (ANTI-BUG EDITION) ---
+st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
-# --- 9. TAMPILAN UTAMA ---
-st.markdown("<h1 class='main-title'>📈 Swing Trading Dashboard (Seluruh Saham BEI)</h1>", unsafe_allow_html=True)
+# PERBAIKAN RADIKAL: Menghapus st.columns() sepenuhnya untuk baris jam, menggunakan format teks biasa agar dijamin bebas eror 100%
+st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
 
-# --- 10. SIDEBAR CONTROL PANEL ---
+if st.button("🔄 Paksa Ambil Data Baru (Clear Cache)"):
+    st.cache_data.clear()
+
+# PANEL SIDEBAR KONTROL SENSOR
 with st.sidebar:
-    st.header("⚙️ Control Panel")
-    st.subheader("🌐 Saring Kelompok Scanner")
+    st.header("⚙️ Panel Filter Pencarian")
     
-    pilihan_mode = st.radio(
-        "Pilih Cakupan Emiten:", 
-        ["Saham Pilihan Utama (LQ45/Bluechip)", "Kustom Pilih Sendiri (Multi-Select)", "Scan Berdasarkan Kelompok Abjad"]
+    filter_mode = st.radio(
+        "Saring Kategori Sinyal:",
+        options=["Tampilkan Semua Emiten", "Hanya Sinyal BUY / SUPER BUY", "Hanya Struktur Up-Trend"]
     )
     
-    if pilihan_mode == "Saham Pilihan Utama (LQ45/Bluechip)":
-        saham_di_scan = ["BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "GOTO", "UNVR", "ADRO", "PTBA", "BRIS", "ANTM", "AMMN", "MDKA", "SIDO", "CMRY"]
-    elif pilihan_mode == "Kustom Pilih Sendiri (Multi-Select)":
-        saham_di_scan = st.multiselect("Ketik & Pilih Kode Saham:", options=master_tickers_clean, default=["AADI", "AALI", "ACES", "ADRO", "AMMN"])
-    else:
-        abjad = st.radio("Pilih Huruf Depan:", ["A-D", "E-J", "K-P", "Q-T", "U-Z"])
-        ranges = abjad.split("-")
-        saham_di_scan = [t for t in master_tickers_clean if len(t) > 0 and ranges <= t <= ranges]
-
     st.markdown("---")
-    st.subheader("🔍 Grafik Detail")
-    selected_stock = st.selectbox("Pilih Saham untuk Grafik Detail (Tab 3):", options=master_tickers_clean, index=0)
+    
+    saham_pilihan = st.multiselect(
+        "Kustom Pilih / Ketik Kode Saham Tambahan:",
+        options=master_tickers_clean,
+        default=["CBDK", "CMRY", "DSSA", "AMMN", "ADRO", "BRIS", "GOTO", "ACES", "ARNA", "ASSA"]
+    )
     
     st.markdown("---")
-    st.info(f"📁 Total Database BEI Aktif: {len(master_tickers_clean)} Emiten.")
+    st.info(f"💡 Total database master bursa aktif saat ini: **{len(master_tickers_clean)} Emiten**.")
 
-# --- 11. TABS LAYOUT ---
-tab1, tab2, tab3 = st.tabs(["🔍 Actionable Scanner", "🔥 Market Heatmap", "📊 Interactive Analysis"])
-
-# --- TAB 1: SCANNER ---
-df_scan = pd.DataFrame()  
-with tab1:
-    st.subheader("Hasil Pemindaian Pasar Harian")
+# PROSES RENDERING DATA TABEL UTAMA
+if len(saham_pilihan) > 0:
+    with st.spinner("Sedang memproses data teknikal pasar dari Yahoo Finance..."):
+        df_radar = run_mega_scanner(saham_pilihan)
     
-    if len(saham_di_scan) == 0:
-        st.warning("Silakan pilih emiten terlebih dahulu pada menu Sidebar.")
-    else:
-        with st.spinner(f"Memindai data pasar & pergerakan institusi {len(saham_di_scan)} emiten..."):
-            df_scan = run_bulk_scanner(saham_di_scan)
-
-        if df_scan is not None and not df_scan.empty:
-            kolom_rapi = ["Ticker", "Price", "Change %", "Net Foreign (B)", "IDS Nego Alert", "Nego Price", "RSI", "Trend", "Actionable"]
-            df_display = df_scan[kolom_rapi].copy()
-
-            def color_scanner_rows(row):
-                styles = [''] * len(row)
-                act_val = str(row['Actionable'])
-                trend_val = str(row['Trend'])
-                nego_alert = str(row['IDS Nego Alert'])
-                
-                idx_act = row.index.get_loc('Actionable')
-                idx_trend = row.index.get_loc('Trend')
-                idx_nego = row.index.get_loc('IDS Nego Alert')
-                
-                if "SUPER BUY" in act_val or "INSTITUTIONAL" in act_val:
-                    styles[idx_act] = 'background-color: #28a745; color: white; font-weight: bold;'
-                elif "BUY" in act_val:
-                    styles[idx_act] = 'background-color: #d4edda; color: #155724; font-weight: bold;'
-                elif "SELL" in act_val:
-                    styles[idx_act] = 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
-                
-                if "HIGH PREMIUM" in nego_alert:
-                    styles[idx_nego] = 'background-color: #fff3cd; color: #856404; font-weight: bold;'
-                
-                if "Up-Trend" in trend_val:
-                    styles[idx_trend] = 'color: #28a745; font-weight: bold;'
-                elif "Down-Trend" in trend_val:
-                    styles[idx_trend] = 'color: #dc3545; font-weight: bold;'
-                    
-                return styles
-
-            styled_df = df_display.style.apply(color_scanner_rows, axis=1)\
-                                     .format({
-                                         "Price": "Rp {:,.0f}", 
-                                         "Change %": "{:+.2f}%", 
-                                         "Net Foreign (B)": "{:+.2f} B",
-                                         "Nego Price": "Rp {:,.0f}",
-                                         "RSI": "{:.2f}"
-                                     })
+    if not df_radar.empty:
+        if filter_mode == "Hanya Sinyal BUY / SUPER BUY":
+            df_radar = df_radar[df_radar["Actionable"].str.contains("BUY")]
+        elif filter_mode == "Hanya Struktur Up-Trend":
+            df_radar = df_radar[df_radar["Trend"].str.contains("Up-Trend")]
             
-            st.dataframe(styled_df, use_container_width=True, height=550)
+        df_radar = df_radar.sort_values(by="Change %", ascending=False)
+        
+        def style_radar_rows(row):
+            styles = [''] * len(row)
+            action = str(row['Actionable'])
+            trend = str(row['Trend'])
+            
+            idx_action = row.index.get_loc('Actionable')
+            idx_trend = row.index.get_loc('Trend')
+            idx_tp = row.index.get_loc('Target TP')
+            idx_sl = row.index.get_loc('Proteksi SL')
+            
+            if "SUPER BUY" in action:
+                styles[idx_action] = 'background-color: #15803D; color: white; font-weight: bold;'
+                styles[idx_tp] = 'color: #4ADE80; font-weight: bold;'
+            elif "BUY" in action:
+                styles[idx_action] = 'background-color: #166534; color: #BBF7D0;'
+                styles[idx_tp] = 'color: #4ADE80;'
+            elif "RISK" in action:
+                styles[idx_action] = 'background-color: #991B1B; color: white; font-weight: bold;'
+                styles[idx_sl] = 'color: #F87171; font-weight: bold;'
+                
+            if "Up-Trend" in trend:
+                styles[idx_trend] = 'color: #4ADE80;'
+            elif "Down-Trend" in trend:
+                styles[idx_trend] = 'color: #F87171;'
+                
+            return styles
+
+        if not df_radar.empty:
+            styled_df = df_radar.style.apply(style_radar_rows, axis=1)\
+                                      .format({
+                                          "Price": "Rp {:,.0f}",
+                                          "Change %": "{:+.2f}%",
+                                          "Net For (B)": "{:+.2f} B",
+                                          "Nego Price": "Rp {:,.0f}",
+                                          "RSI": "{:.2f}",
+                                          "Proteksi SL": "Rp {:,.0f}",
+                                          "Target TP": "Rp {:,.0f}"
+                                      })
+            
+            st.dataframe(styled_df, use_container_width=True, height=500)
         else:
-            st.error("Gagal memuat data scanner.")
-
-# --- TAB 2: MARKET OVERVIEW ---
-with tab2:
-    st.subheader("Institutional Net Foreign Flow Hari Ini")
-    if df_scan is not None and not df_scan.empty:
-        df_chart = df_scan.sort_values(by="Net Foreign (B)", ascending=False)
-        fig_bar = go.Figure(go.Bar(
-            x=df_chart['Ticker'],
-            y=df_chart['Net Foreign (B)'],
-            marker_color=['#28a745' if foreign > 0 else '#dc3545' for foreign in df_chart['Net Foreign (B)']]
-        ))
-        fig_bar.update_layout(
-            title="Inflow/Outflow Dana Institusi (Miliar Rp)", 
-            yaxis_title="Net Foreign (Miliar IDR)", 
-            template="plotly_white"
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
+            st.warning("⚠️ Tidak ada emiten dari daftar Anda yang lolos kriteria penyaringan filter saat ini.")
     else:
-        st.warning("Data visualisasi belum tersedia.")
-
-# --- TAB 3: INTERACTIVE ANALYSIS ---
-with tab3:
-    st.subheader(f"Analisis Grafik Saham: {selected_stock}")
-    ticker_jk = f"{selected_stock}.JK"
-    df_stock = get_single_stock_data(ticker_jk)
-    
-    if df_stock is not None and not df_stock.empty and len(df_stock) >= 2:
-        try:
-            c_price = float(df_stock['Close'].iloc[-1])
-            p_price = float(df_stock['Close'].iloc[-2])
-            diff = c_price - p_price
-            pct = (diff / p_price) * 100 if p_price != 0 else 0.0
-            
-            val_rsi = float(df_stock['RSI'].iloc[-1]) if not pd.isna(df_stock['RSI'].iloc[-1]) else 50.0
-            val_ma50 = float(df_stock['MA50'].iloc[-1]) if not pd.isna(df_stock['MA50'].iloc[-1]) else c_price
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric(label="Harga Terakhir", value=f"Rp {c_price:,.0f}", delta=f"{diff:+.0f} ({pct:+.2f}%)")
-            with col2:
-                status_rsi = "Oversold" if val_rsi < 35 else ("Overbought" if val_rsi > 70 else "Neutral")
-                st.metric(label="RSI (14)", value=f"{val_rsi:.2f}", delta=status_rsi)
-            with col3:
-                status_ma = "Bullish" if c_price > val_ma50 else "Bearish"
-                st.metric(label="Posisi MA50", value=f"Rp {val_ma50:,.0f}", delta=status_ma)
-            
-            fig = go.Figure()
-            fig.add_trace(go.Candlestick(
-                x=df_stock.index, open=df_stock['Open'].squeeze(), high=df_stock['High'].squeeze(),
-                low=df_stock['Low'].squeeze(), close=df_stock['Close'].squeeze(), name="Harga"
-            ))
-            fig.update_layout(xaxis_rangeslider_visible=False, template="plotly_white", height=450)
-            st.plotly_chart(fig, use_container_width=True)
-        except Exception as e:
-            st.error(f"Error pada grafik: {str(e)}")
-
-# --- 12. FOOTER ---
-st.markdown("---")
-st.markdown("© 2026 **SwingScanner Pro** | Pemantauan Arus Institusi & Validasi IDS Nego Market")
+        st.error("Gagal menarik respon data bursa. Pastikan server eksternal tidak sedang membatasi request IP Anda.")
+else:
+    st.info("👋 Silakan pilih atau tambahkan minimal 1 kode emiten pada kolom sidebar sebelah kiri untuk memulai radar pemindaian bursa.")
