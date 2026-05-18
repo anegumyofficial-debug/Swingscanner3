@@ -3,13 +3,13 @@ import pandas as pd
 import yfinance as yf
 import pandas_ta as ta
 from datetime import datetime
-import pytz  # Library untuk mengunci zona waktu
+import pytz  
 import concurrent.futures
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Swing & Scalper Dashboard BEI", layout="wide", page_icon="📈")
 
-# Atur zona waktu lokal ke WIB
+# Mengunci jam server ke zona waktu WIB (Asia/Jakarta)
 wib_tz = pytz.timezone('Asia/Jakarta')
 wib_now = datetime.now(wib_tz)
 
@@ -92,7 +92,7 @@ def analyze_market_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
         
-        # Optimalisasi yfinance: Ambil 3 bulan penuh untuk kalkulasi technical indicator, otomatis cover data hari ini
+        # Mengambil data histori 3 bulan agar candle live ter-cover maksimal
         df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
         
@@ -162,6 +162,7 @@ def analyze_market_momentum(ticker):
             
         ticker_name = ticker.replace(".JK", "")
         
+        # <<< DIPERBAIKI: Mengubah typo 'childhood_k' kembali menjadi 'and last_k' yang valid
         if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.1):
             action_signal = "🔥 SUPER BUY"
             stop_loss = round(min(last_ema9, last_ema20), 0)
@@ -170,7 +171,7 @@ def analyze_market_momentum(ticker):
             action_signal = "🎯 BUY (Oversold)"
             stop_loss = round(last_price * 0.95, 0)
             take_profit = round(last_price * 1.05, 0)
-        elif last_price < last_ema9 childhood_k < last_d and last_rsi > 70:
+        elif last_price < last_ema9 and last_k < last_d and last_rsi > 70:
             action_signal = "🚨 RISK (Jenuh Beli)"
             stop_loss = 0
             take_profit = 0
@@ -216,6 +217,7 @@ st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten
 # ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG -----------------
 st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
 
+# <<< DIPERBAIKI: Memberikan argumen angka '2' ke dalam st.columns agar tidak memicu TypeError
 tf_col1, tf_col2 = st.columns(2)
 with tf_col2:
     timeframe_pilihan = st.radio(
@@ -237,7 +239,6 @@ try:
     ihsg_data = yf.download("^JKSE", period=p_conf["period"], interval=p_conf["interval"], progress=False)
     ihsg_data = clean_yf_dataframe(ihsg_data)
     
-    # Tarik data harian pembanding 7 hari terakhir agar rujukan harga live ter-update maksimal
     ihsg_live = yf.download("^JKSE", period="7d", interval="1d", progress=False)
     ihsg_live = clean_yf_dataframe(ihsg_live)
     
@@ -249,6 +250,7 @@ try:
         ihsg_high = float(ihsg_data['High'].max())
         ihsg_low = float(ihsg_data['Low'].min())
         
+        # <<< DIPERBAIKI: Memberikan argumen angka '4' ke st.columns agar membagi grid layout dengan benar
         col_i1, col_i2, col_i3, col_i4 = st.columns(4)
         with col_i1:
             st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
@@ -269,7 +271,6 @@ except Exception as e:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Menampilkan Waktu Sinkronisasi Berdasarkan Jam WIB yang Asli
 st.write(f"⏰ Jam Sinkronisasi Terakhir: **{wib_now.strftime('%d-%m-%Y %H:%M:%S')} WIB** (Zona Waktu Terkunci Asia/Jakarta)")
 
 if st.button("🔄 Paksa Ambil Data Baru (Clear Cache)"):
