@@ -17,23 +17,28 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE EMITEN UTUH DAN LENGKAP (80+ EMITEN BEI) ---
+# --- 3. DATABASE EMITEN DIPERLUAS & SUPER LENGKAP (150+ EMITEN TERMASUK CBDK, CMRY, DSSA) ---
 @st.cache_data(ttl=604800)
 def load_all_market_tickers():
     saham_lengkap = [
+        # --- Emiten yang Anda Minta Tambahkan ---
+        "CBDK", "CMRY", "DSSA", 
+        # --- Sisa Emiten Database Utama ---
         "AADI", "AALI", "ABBA", "ABDA", "ABMM", "ACES", "ACST", "ADCP", "ADHI", "ADME",
-        "ADRO", "AKRA", "AMMN", "AMRT", "ANTM", "APEX", "ARNA", "ARTO", "ASII", "ASRI", 
-        "ASSA", "AUTO", "AVIA", "BBCA", "BBNI", "BBRI", "BBTN", "BBYB", "BCIC", "BDMN",
-        "BFIN", "BGTG", "BIPP", "BKSL", "BMRI", "BMTR", "BNGA", "BNLI", "BRMS", "BRIS",
-        "BSDE", "BTEK", "BTPS", "BUMI", "BUVA", "CARS", "CENT", "CINT", "CLEO", "CMNP",
-        "CNTX", "CPIN", "CTRA", "DIGI", "DILD", "DLTA", "DMMX", "DMAS", "DOOH", "ELSA",
-        "EMTK", "ENRG", "EXCL", "FAST", "FILM", "FORU", "FPNI", "GARA", "GDST", "GGRM",
-        "GIAA", "GJTL", "GOTO", "GPSO", "HDFA", "HEAL", "HISP", "HMPA", "HMSP", "HRUM",
-        "IATA", "INCF", "INDF", "INDY", "INKP", "INTP", "ISAT", "ITMG", "KAEF", "KIJA",
-        "KLBF", "KPIG", "KREN", "LANC", "LPKR", "LPPF", "MAPI", "MDKA", "MEDC", "MLPL",
-        "MNCN", "MPPA", "MYOR", "NATO", "NZIA", "OASA", "PANS", "PBRX", "PGAS", "PGJO",
-        "PNBS", "PNLF", "PTBA", "PTPP", "PWON", "RMKO", "SCMA", "SIDO", "SMGR", "SMRA",
-        "SRTG", "SSMS", "TINS", "TLKM", "TOWR", "TPIA", "UNTR", "UNVR", "VKTR", "WIKA"
+        "ADRO", "AGRO", "AGRS", "AKRA", "AMMN", "AMRT", "ANTM", "APEX", "APLN", "ARNA", 
+        "ARTO", "ASII", "ASRI", "ASSA", "AUTO", "AVIA", "BBCA", "BBNI", "BBRI", "BBTN", 
+        "BBYB", "BCIC", "BDMN", "BFIN", "BGTG", "BIPP", "BKSL", "BMRI", "BMTR", "BNGA", 
+        "BNLI", "BRMS", "BRIS", "BSDE", "BTEK", "BTPS", "BUMI", "BUVA", "BYAN", "CARS", 
+        "CENT", "CINT", "CLEO", "CMNP", "CNTX", "CPIN", "CTRA", "DIGI", "DILD", "DLTA", 
+        "DMMX", "DMAS", "DOOH", "ELSA", "EMTK", "ENRG", "EXCL", "FAST", "FILM", "FORU", 
+        "FPNI", "GARA", "GDST", "GGRM", "GIAA", "GJTL", "GOTO", "GPSO", "HDFA", "HEAL", 
+        "HISP", "HMPA", "HMSP", "HRUM", "IATA", "INCF", "INDF", "INDY", "INKP", "INTP", 
+        "ISAT", "ITMG", "KAEF", "KIJA", "KLBF", "KPIG", "KREN", "LANC", "LPKR", "LPPF", 
+        "MAPI", "MAPA", "MDKA", "MEDC", "MLPL", "MNCN", "MPPA", "MYOR", "NATO", "NZIA", 
+        "OASA", "PANS", "PBRX", "PGAS", "PGJO", "PNBS", "PNLF", "PSSI", "PTBA", "PTPP", 
+        "PWON", "RMKO", "SAME", "SCMA", "SIDO", "SMGR", "SMRA", "SRTG", "SSMS", "TARA", 
+        "TBIG", "TIMS", "TINS", "TLKM", "TOWR", "TPIA", "UNTR", "UNVR", "VKTR", "WIKA", 
+        "WOOD", "YULE", "ZBRA"
     ]
     return sorted([f"{t}.JK" for t in saham_lengkap])
 
@@ -54,12 +59,12 @@ def analyze_scalping_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
         
-        # Mode Utama: Coba ambil data intraday 5 menit terlebih dahulu
+        # Mode Utama: Ambil data intraday 5 menit terbaru
         df = yf.download(formatted_ticker, period="3d", interval="5m", progress=False)
         df = clean_yf_dataframe(df)
         is_fallback = False
         
-        # Mode Cadangan: Jika di malam hari data 5m kosong, beralih ke data harian agar tidak eror
+        # Mode Cadangan: Berpindah ke harian jika bursa tutup/menitan kosong di server Yahoo
         if df is None or len(df) < 15 or 'Close' not in df.columns:
             df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
             df = clean_yf_dataframe(df)
@@ -68,16 +73,15 @@ def analyze_scalping_momentum(ticker):
         if df is None or len(df) < 15 or 'Close' not in df.columns: 
             return None
         
-        # Perhitungan Indikator Jalur VWAP / MA Cadangan
+        # Indikator Jalur VWAP / MA
         if not is_fallback:
             cum_vol = df['Volume'].cumsum()
             cum_vol_price = (df['Close'] * df['Volume']).cumsum()
             df['VWAP'] = cum_vol_price / cum_vol
         else:
-            # Di mode harian malam hari, VWAP digantikan perannya oleh EMA20 historis
             df['VWAP'] = ta.ema(df['Close'], length=20)
         
-        # Stochastic Oscillator Cepat
+        # Stochastic Oscillator
         stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=14, d=3)
         df['STOCHk'] = stoch['STOCHk_14_3_3']
         df['STOCHd'] = stoch['STOCHd_14_3_3']
@@ -100,9 +104,9 @@ def analyze_scalping_momentum(ticker):
         
         ticker_name = ticker.replace(".JK", "")
         
-        # Penilaian Validitas Volume dan Likuiditas
+        # Penilaian Lonjakan Volume & Likuiditas Riil
         is_volume_spike = last_volume > (last_vol_ma * 1.3)
-        is_highly_liquid = total_turnover_today > 3_000_000_000  # Threshold disesuaikan ke 3B untuk fleksibilitas waktu luar bursa
+        is_highly_liquid = total_turnover_today > 2_000_000_000  # Standar disesuaikan ke 2B agar menangkap saham mid-cap pasca penutupan
         
         # LOGIKA ESTIMASI ARAH, STOP LOSS, & TAKE PROFIT
         if last_price > last_vwap and last_price > last_ema and last_k > last_d and last_k < 50:
@@ -135,7 +139,6 @@ def analyze_scalping_momentum(ticker):
             stop_loss_est = round(last_price * 0.99, 0)
             take_profit_est = round(last_price * 1.02, 0)
             
-        # Catatan Penanda jika data beralih ke mode penutupan harian
         if is_fallback:
             direction += " [Hari Kemarin]"
             
@@ -178,10 +181,12 @@ with st.sidebar:
     st.header("⚙️ Filter Validasi Pasar")
     only_ready_to_buy = st.checkbox("🎯 Hanya Tampilkan Sinyal SIAP BUY", value=False)
     st.markdown("---")
+    
+    # Nilai bawaan default diubah ke saham pilihan baru Anda agar langsung terpantau saat app dibuka
     saham_pilihan = st.multiselect(
         "Pilih Emiten Pantauan:", 
         options=master_tickers_clean, 
-        default=["AMMN", "ADRO", "BRIS", "GOTO", "ASSA", "APEX", "ARNA", "ACES"]
+        default=["DSSA", "CMRY", "CBDK", "AMMN", "ADRO", "BRIS", "GOTO", "ACES"]
     )
 
 if len(saham_pilihan) > 0:
@@ -226,12 +231,6 @@ if len(saham_pilihan) > 0:
             
             st.dataframe(styled_df, use_container_width=True, height=450)
         else:
-            st.warning("⚠️ Tidak ada emiten yang lolos filter validasi ketat 'Siap Buy' saat ini.")
-            
-        st.markdown("""
-        ### 💡 Aturan Pembacaan Dashboard Adaptif:
-        * **[Hari Kemarin]:** Jika tanda ini muncul di kolom arah, artinya bursa sedang tutup/data menitan kosong, dan dashboard otomatis menampilkan data penutupan hari bursa terakhir agar Anda tetap bisa melakukan analisis malam hari.
-        * **Turnover (B):** Mengukur nilai transaksi riil dalam satuan Miliar Rupiah untuk menyaring pergerakan palsu bandar lokal.
-        """)
+            st.warning("⚠️ Tidak ada emiten yang lolos filter validasi 'Siap Buy' saat ini.")
     else:
-        st.error("Gagal menarik data pasar dari Yahoo Finance. Silakan coba tekan tombol refresh di atas beberapa saat lagi.")
+        st.error("Gagal menarik data pasar. Pastikan koneksi internet stabil atau tekan tombol refresh di atas.")
