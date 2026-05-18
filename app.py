@@ -65,7 +65,7 @@ def load_mega_market_tickers():
         "TIFA", "TINS", "TIRA", "TIRT", "TKIM", "TLKM", "TLDN", "TMAS", "TMPO", "TOBA", "TOGA", "TONS", "TOTAL", "TOTO", "TOWR", 
         "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN", 
         "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS", 
-        "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
+        "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
         "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE"
     ]
     return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
@@ -206,10 +206,10 @@ def run_mega_scanner(ticker_list):
 st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
-# ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG -----------------
+# ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG (FIXED) -----------------
 st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
 
-# Sediakan kontrol filter jangka waktu di atas grafik
+# FIX: Menyediakan kolom dengan melemparkan parameter rasio kolom secara eksplisit agar tidak error
 tf_col1, tf_col2 = st.columns()
 with tf_col2:
     timeframe_pilihan = st.radio(
@@ -229,11 +229,11 @@ tf_mapping = {
 p_conf = tf_mapping[timeframe_pilihan]
 
 try:
-    # Tarik data multi-timeframe berdasarkan input user
+    # Ambil data grafik IHSG multi-timeframe
     ihsg_data = yf.download("^JKSE", period=p_conf["period"], interval=p_conf["interval"], progress=False)
     ihsg_data = clean_yf_dataframe(ihsg_data)
     
-    # Tetap tarik data harian pembanding untuk info kartu metrik terupdate saat ini
+    # Ambil data pembanding harian untuk info ringkasan pasar terupdate saat ini
     ihsg_live = yf.download("^JKSE", period="5d", interval="1d", progress=False)
     ihsg_live = clean_yf_dataframe(ihsg_live)
     
@@ -242,23 +242,21 @@ try:
         prev_ihsg = float(ihsg_live['Close'].iloc[-2])
         ihsg_change = ((current_ihsg - prev_ihsg) / prev_ihsg) * 100
         
-        # Hitung batas tertinggi & terendah sesuai range waktu yang dipilih user
+        # Hitung batas tertinggi & terendah sesuai timeframe pilihan investor
         ihsg_high = float(ihsg_data['High'].max())
         ihsg_low = float(ihsg_data['Low'].min())
         
-        # Rendering Box Informasi Border IHSG
-        col_i1, col_i2, col_i3, col_i4 = st.columns(4)
-        with col_i1:
-            st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
-        with col_i2:
-            st.metric(label=f"📈 {p_conf['label']} Max", value=f"{ihsg_high:,.2f}")
-        with col_i3:
-            st.metric(label=f"📉 {p_conf['label']} Min", value=f"{ihsg_low:,.2f}")
-        with col_i4:
-            status_pasar = "🚨 Gawat / Bearish" if ihsg_change < -1.2 else "⏳ Konsolidasi" if abs(ihsg_change) <= 1.2 else "🚀 Bullish Kuat"
-            st.metric(label="⚡ Kondisi Sentimen Harian", value=status_pasar)
+        # Susun Box Informasi Metrik Pasar Utama
+        with tf_col1:
+            m_col1, m_col2, m_col3 = st.columns(3)
+            with m_col1:
+                st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
+            with m_col2:
+                st.metric(label=f"📈 {p_conf['label']} Max", value=f"{ihsg_high:,.2f}")
+            with m_col3:
+                st.metric(label=f"📉 {p_conf['label']} Min", value=f"{ihsg_low:,.2f}")
         
-        # Rendering Chart Garis Historis IHSG Sesuai Filter
+        # Tampilkan Grafik Tren Garis
         st.markdown(f"**📊 Grafik Pergerakan Histori IHSG Rentang: {timeframe_pilihan}**")
         chart_df = ihsg_data[['Close']].copy()
         st.line_chart(chart_df, height=220)
