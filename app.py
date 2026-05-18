@@ -206,40 +206,67 @@ def run_mega_scanner(ticker_list):
 st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
-# ----------------- COOP BARU: KOMPONEN TRACKER CHART IHSG -----------------
+# ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG -----------------
+st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
+
+# Sediakan kontrol filter jangka waktu di atas grafik
+tf_col1, tf_col2 = st.columns()
+with tf_col2:
+    timeframe_pilihan = st.radio(
+        "Pilih Rentang Waktu Grafik:",
+        options=["Hari (5 Hari)", "Minggu (1 Bulan)", "Bulan (6 Bulan)", "Tahun (1 Tahun)"],
+        horizontal=True
+    )
+
+# Konversi pilihan teks ke parameter Yahoo Finance (period & interval)
+tf_mapping = {
+    "Hari (5 Hari)": {"period": "5d", "interval": "15m", "label": "Batas Tertinggi & Terendah (5 Hari)"},
+    "Minggu (1 Bulan)": {"period": "1mo", "interval": "1d", "label": "Batas Tertinggi & Terendah (1 Bulan)"},
+    "Bulan (6 Bulan)": {"period": "6mo", "interval": "1d", "label": "Batas Tertinggi & Terendah (6 Bulan)"},
+    "Tahun (1 Tahun)": {"period": "1y", "interval": "1d", "label": "Batas Tertinggi & Terendah (1 Tahun)"}
+}
+
+p_conf = tf_mapping[timeframe_pilihan]
+
 try:
-    with st.spinner("Mengambil border harga dan tren IHSG terbaru..."):
-        ihsg_data = yf.download("^JKSE", period="1mo", interval="1d", progress=False)
-        ihsg_data = clean_yf_dataframe(ihsg_data)
+    # Tarik data multi-timeframe berdasarkan input user
+    ihsg_data = yf.download("^JKSE", period=p_conf["period"], interval=p_conf["interval"], progress=False)
+    ihsg_data = clean_yf_dataframe(ihsg_data)
+    
+    # Tetap tarik data harian pembanding untuk info kartu metrik terupdate saat ini
+    ihsg_live = yf.download("^JKSE", period="5d", interval="1d", progress=False)
+    ihsg_live = clean_yf_dataframe(ihsg_live)
+    
+    if ihsg_data is not None and not ihsg_data.empty:
+        current_ihsg = float(ihsg_live['Close'].iloc[-1])
+        prev_ihsg = float(ihsg_live['Close'].iloc[-2])
+        ihsg_change = ((current_ihsg - prev_ihsg) / prev_ihsg) * 100
         
-        if ihsg_data is not None and not ihsg_data.empty:
-            current_ihsg = float(ihsg_data['Close'].iloc[-1])
-            prev_ihsg = float(ihsg_data['Close'].iloc[-2])
-            ihsg_change = ((current_ihsg - prev_ihsg) / prev_ihsg) * 100
-            
-            ihsg_high = float(ihsg_data['High'].max())
-            ihsg_low = float(ihsg_data['Low'].min())
-            
-            # Rendering Box Informasi Border IHSG
-            st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
-            col_i1, col_i2, col_i3, col_i4 = st.columns(4)
-            with col_i1:
-                st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
-            with col_i2:
-                st.metric(label="📈 Batas Tertinggi (1 Bln)", value=f"{ihsg_high:,.2f}")
-            with col_i3:
-                st.metric(label="📉 Batas Terendah (1 Bln)", value=f"{ihsg_low:,.2f}")
-            with col_i4:
-                status_pasar = "🚨 Gawat / Bearish" if ihsg_change < -1.5 else "⏳ Konsolidasi" if abs(ihsg_change) <= 1.5 else "🚀 Bullish Kuat"
-                st.metric(label="⚡ Kondisi Sentimen", value=status_pasar)
-            
-            # Rendering Chart Garis Historis IHSG
-            st.markdown("**📊 Grafik Tren Pergerakan IHSG (1 Bulan Terakhir):**")
-            chart_df = ihsg_data[['Close']].copy()
-            st.line_chart(chart_df, height=200)
-            st.markdown("</div>", unsafe_allow_html=True)
+        # Hitung batas tertinggi & terendah sesuai range waktu yang dipilih user
+        ihsg_high = float(ihsg_data['High'].max())
+        ihsg_low = float(ihsg_data['Low'].min())
+        
+        # Rendering Box Informasi Border IHSG
+        col_i1, col_i2, col_i3, col_i4 = st.columns(4)
+        with col_i1:
+            st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
+        with col_i2:
+            st.metric(label=f"📈 {p_conf['label']} Max", value=f"{ihsg_high:,.2f}")
+        with col_i3:
+            st.metric(label=f"📉 {p_conf['label']} Min", value=f"{ihsg_low:,.2f}")
+        with col_i4:
+            status_pasar = "🚨 Gawat / Bearish" if ihsg_change < -1.2 else "⏳ Konsolidasi" if abs(ihsg_change) <= 1.2 else "🚀 Bullish Kuat"
+            st.metric(label="⚡ Kondisi Sentimen Harian", value=status_pasar)
+        
+        # Rendering Chart Garis Historis IHSG Sesuai Filter
+        st.markdown(f"**📊 Grafik Pergerakan Histori IHSG Rentang: {timeframe_pilihan}**")
+        chart_df = ihsg_data[['Close']].copy()
+        st.line_chart(chart_df, height=220)
+        
 except Exception as e:
-    st.warning("⚠️ Gagal memuat chart IHSG eksternal sementara waktu, silakan segarkan halaman.")
+    st.warning("⚠️ Gagal memuat chart IHSG multi-timeframe, silakan tunggu beberapa saat atau klik refresh.")
+
+st.markdown("</div>", unsafe_allow_html=True)
 
 st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
 
