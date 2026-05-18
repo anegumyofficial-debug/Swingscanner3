@@ -54,17 +54,28 @@ def analyze_scalping_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
         
-        # Mengambil data intraday 5 menit terbaru
+        # Mode Utama: Coba ambil data intraday 5 menit terlebih dahulu
         df = yf.download(formatted_ticker, period="3d", interval="5m", progress=False)
         df = clean_yf_dataframe(df)
+        is_fallback = False
         
-        if df is None or len(df) < 25 or 'Close' not in df.columns: 
+        # Mode Cadangan: Jika di malam hari data 5m kosong, beralih ke data harian agar tidak eror
+        if df is None or len(df) < 15 or 'Close' not in df.columns:
+            df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
+            df = clean_yf_dataframe(df)
+            is_fallback = True
+            
+        if df is None or len(df) < 15 or 'Close' not in df.columns: 
             return None
         
-        # Perhitungan Indikator Jalur VWAP
-        cum_vol = df['Volume'].cumsum()
-        cum_vol_price = (df['Close'] * df['Volume']).cumsum()
-        df['VWAP'] = cum_vol_price / cum_vol
+        # Perhitungan Indikator Jalur VWAP / MA Cadangan
+        if not is_fallback:
+            cum_vol = df['Volume'].cumsum()
+            cum_vol_price = (df['Close'] * df['Volume']).cumsum()
+            df['VWAP'] = cum_vol_price / cum_vol
+        else:
+            # Di mode harian malam hari, VWAP digantikan perannya oleh EMA20 historis
+            df['VWAP'] = ta.ema(df['Close'], length=20)
         
         # Stochastic Oscillator Cepat
         stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=14, d=3)
@@ -72,17 +83,15 @@ def analyze_scalping_momentum(ticker):
         df['STOCHd'] = stoch['STOCHd_14_3_3']
         
         df['EMA9'] = ta.ema(df['Close'], length=9)
-        
-        # --- VALIDASI TAMBAHAN (VOLUME SPIKE & TURNOVER) ---
         df['Vol_MA20'] = df['Volume'].rolling(window=20).mean()
         total_turnover_today = (df['Close'] * df['Volume']).sum()
         
-        # Data Menit Terakhir
+        # Data Menit/Hari Terakhir
         last_price = float(df['Close'].iloc[-1])
-        last_vwap = float(df['VWAP'].iloc[-1])
-        last_k = float(df['STOCHk'].iloc[-1])
-        last_d = float(df['STOCHd'].iloc[-1])
-        last_ema = float(df['EMA9'].iloc[-1])
+        last_vwap = float(df['VWAP'].iloc[-1]) if not pd.isna(df['VWAP'].iloc[-1]) else last_price
+        last_k = float(df['STOCHk'].iloc[-1]) if not pd.isna(df['STOCHk'].iloc[-1]) else 50.0
+        last_d = float(df['STOCHd'].iloc[-1]) if not pd.isna(df['STOCHd'].iloc[-1]) else 50.0
+        last_ema = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
         last_volume = float(df['Volume'].iloc[-1])
         last_vol_ma = float(df['Vol_MA20'].iloc[-1]) if not pd.isna(df['Vol_MA20'].iloc[-1]) else 1.0
         
@@ -92,12 +101,11 @@ def analyze_scalping_momentum(ticker):
         ticker_name = ticker.replace(".JK", "")
         
         # Penilaian Validitas Volume dan Likuiditas
-        is_volume_spike = last_volume > (last_vol_ma * 1.5)
-        is_highly_liquid = total_turnover_today > 5_000_000_000  # Minimal Rp 5 Miliar
+        is_volume_spike = last_volume > (last_vol_ma * 1.3)
+        is_highly_liquid = total_turnover_today > 3_000_000_000  # Threshold disesuaikan ke 3B untuk fleksibilitas waktu luar bursa
         
         # LOGIKA ESTIMASI ARAH, STOP LOSS, & TAKE PROFIT
-        if last_price > last_vwap and last_price > last_ema and last_k > last_d and last_k < 45:
-            # Sinyal Tertinggi hanya jika lolos uji Volume Spike dan Likuiditas Pasar
+        if last_price > last_vwap and last_price > last_ema and last_k > last_d and last_k < 50:
             if is_volume_spike and is_highly_liquid:
                 direction = "🚀 STRONG UP (Siap Buy)"
             else:
@@ -127,12 +135,16 @@ def analyze_scalping_momentum(ticker):
             stop_loss_est = round(last_price * 0.99, 0)
             take_profit_est = round(last_price * 1.02, 0)
             
+        # Catatan Penanda jika data beralih ke mode penutupan harian
+        if is_fallback:
+            direction += " [Hari Kemarin]"
+            
         return {
             "Ticker": ticker_name,
             "Live Price": last_price,
-            "5m Change %": round(change_pct, 2),
+            "Change %": round(change_pct, 2),
             "Turnover (B)": round(total_turnover_today / 1_000_000_000, 2),
-            "VWAP Intraday": round(last_vwap, 0),
+            "VWAP/MA Baseline": round(last_vwap, 0),
             "Stoch %K": round(last_k, 2),
             "Stoch %D": round(last_d, 2),
             "Est. Arah": direction,
@@ -155,7 +167,6 @@ def run_scalper_scanner(ticker_list):
 # --- 5. INTERFACE PANEL KONTROL & SIDEBAR ---
 st.markdown("<h1 class='main-title'>⚡ Scalper Radar Pro (Sinyal Siap Buy & Target TP/SL)</h1>", unsafe_allow_html=True)
 
-# PERBAIKAN UTAMA: Mengamankan inisialisasi kolom di Python 3.12
 col_title1, col_title2 = st.columns(2)
 with col_title1:
     st.write(f"Terakhir Sinkron: {datetime.now().strftime('%H:%M:%S')} WIB")
@@ -165,9 +176,7 @@ with col_title2:
 
 with st.sidebar:
     st.header("⚙️ Filter Validasi Pasar")
-    
     only_ready_to_buy = st.checkbox("🎯 Hanya Tampilkan Sinyal SIAP BUY", value=False)
-    
     st.markdown("---")
     saham_pilihan = st.multiselect(
         "Pilih Emiten Pantauan:", 
@@ -180,9 +189,9 @@ if len(saham_pilihan) > 0:
     
     if not df_scalp.empty:
         if only_ready_to_buy:
-            df_scalp = df_scalp[df_scalp["Est. Arah"].str.contains("STRONG UP")]
+            df_scalp = df_scalp[df_scalp["Est. Arah"].str.contains("STRONG UP|UP MOMENTUM")]
         
-        df_scalp = df_scalp.sort_values(by="5m Change %", ascending=False)
+        df_scalp = df_scalp.sort_values(by="Change %", ascending=False)
         
         def style_scalper(row):
             styles = [''] * len(row)
@@ -206,9 +215,9 @@ if len(saham_pilihan) > 0:
             styled_df = df_scalp.style.apply(style_scalper, axis=1)\
                                       .format({
                                           "Live Price": "Rp {:,.0f}",
-                                          "5m Change %": "{:+.2f}%",
+                                          "Change %": "{:+.2f}%",
                                           "Turnover (B)": "{:,.2f} B",
-                                          "VWAP Intraday": "Rp {:,.0f}",
+                                          "VWAP/MA Baseline": "Rp {:,.0f}",
                                           "Stoch %K": "{:.2f}",
                                           "Stoch %D": "{:.2f}",
                                           "Proteksi Stop Loss": "Rp {:,.0f}",
@@ -217,12 +226,12 @@ if len(saham_pilihan) > 0:
             
             st.dataframe(styled_df, use_container_width=True, height=450)
         else:
-            st.warning("⚠️ Tidak ada emiten yang lolos filter validasi ketat 'Siap Buy' saat ini. Kemungkinan volume transaksi / turnover pasar belum memenuhi syarat minimal.")
+            st.warning("⚠️ Tidak ada emiten yang lolos filter validasi ketat 'Siap Buy' saat ini.")
             
         st.markdown("""
-        ### 💡 Perubahan Struktur Validasi Baru:
-        * **Kolom Turnover (B):** Menampilkan nilai transaksi berjalan dalam satuan Miliar Rupiah. Saham dengan turnover di bawah 5 Miliar otomatis akan diturunkan statusnya untuk menghindari jebakan likuiditas.
-        * **Validasi Sinyal:** Status `🚀 STRONG UP` kini dilindungi sistem pendeteksi lonjakan volume mendadak agar Anda terhindar dari pembalikan harga sepihak (*Fake Breakout*).
+        ### 💡 Aturan Pembacaan Dashboard Adaptif:
+        * **[Hari Kemarin]:** Jika tanda ini muncul di kolom arah, artinya bursa sedang tutup/data menitan kosong, dan dashboard otomatis menampilkan data penutupan hari bursa terakhir agar Anda tetap bisa melakukan analisis malam hari.
+        * **Turnover (B):** Mengukur nilai transaksi riil dalam satuan Miliar Rupiah untuk menyaring pergerakan palsu bandar lokal.
         """)
     else:
-        st.info("Gagal memuat data intraday pasar. Pastikan jam bursa berjalan atau server Yahoo Finance merespon.")
+        st.error("Gagal menarik data pasar dari Yahoo Finance. Silakan coba tekan tombol refresh di atas beberapa saat lagi.")
