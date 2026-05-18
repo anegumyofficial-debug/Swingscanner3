@@ -18,10 +18,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE MASTER EMITEN SUPER LENGKAP (300+ SAHAM BEI) ---
+# --- 3. DATABASE MASTER EMITEN SUPER LENGKAP (315+ SAHAM BEI UTUH) ---
 @st.cache_data(ttl=604800)
 def load_mega_market_tickers():
-    # Menggabungkan seluruh sektor utama di BEI (Bluechip, Mid-cap, Small-cap, & IPO Baru)
     saham_300_plus = [
         "AADI", "AALI", "ABBA", "ABDA", "ABMM", "ACES", "ACST", "ADCP", "ADHI", "ADME", "ADRO", "AGRO", "AGRS", "AHAP", "AISA",
         "AKRA", "AKSI", "ALDO", "ALKA", "ALMI", "AMAG", "AMAN", "AMAR", "AMMN", "AMOR", "AMRT", "ANDI", "ANER", "ANTM", "APEX",
@@ -31,43 +30,42 @@ def load_mega_market_tickers():
         "BEEF", "BEKS", "BFIN", "BFTC", "BGTG", "BHAT", "BHIT", "BIMA", "BIPI", "BIPP", "BIRD", "BISI", "BKDP", "BKSL", "BKSW",
         "BMAS", "BMBL", "BMRI", "BMTR", "BNGA", "BNLI", "BNII", "BOBA", "BOLA", "BORO", "BPII", "BRMS", "BRIS", "BRNA", "BRPT",
         "BSDE", "BSIM", "BSSR", "BSWD", "BTEK", "BTPS", "BUKK", "BUVA", "BUMI", "BUTI", "BVIC", "BWPT", "BYAN", "CADI", "CAMP",
-        "CANT", "CARE", "CARS", "CASA", "CASH", "CASS", "CATT", "CEKA", "CENT", "CESS", "CFIN", "CINT", "CITA", "CITY", "CLAY",
-        "CLEO", "CLPI", "CMNP", "CMRY", "CNMA", "CNTX", "COAL", "COCO", "CPIN", "CPRI", "CPRO", "CSAP", "CSIS", "CSRA", "CTRA",
-        "CTTH", "CUAN", "CYBER", "DAAZ", "DART", "DAYA", "DEAL", "DEFI", "DEWA", "DFAM", "DGIK", "DHCO", "DIGI", "DILD", "DIVA",
-        "DKFT", "DLTA", "DMAS", "DMED", "DMMX", "DNAR", "DOMI", "DOOH", "DPNS", "DPUM", "DRMA", "DSSA", "DSFI", "DSNG", "DTAL",
-        "DUTO", "DVLA", "DXJN", "DYAN", "EAST", "ECII", "EDII", "EKAD", "ELIT", "ELSA", "EMAL", "EMDE", "EMTK", "ENRG", "EPAC",
-        "EPMT", "ERAA", "ERTX", "ESIP", "ESSA", "ESTA", "ETWA", "EXCL", "FAPA", "FAST", "FASW", "FEST", "FIKA", "FILM", "FINN",
-        "FIRE", "FMII", "FPNI", "FORU", "FOTA", "FRAS", "FUJI", "GAMA", "GAMR", "GARA", "GCOAL", "GDST", "GDYR", "GEMS", "GGRM",
-        "GHEO", "GIAA", "GJTL", "GLOB", "GMCW", "GMTD", "GOLD", "GOTO", "GPRA", "GPSO", "GRHA", "GRIA", "GRPM", "GSMF", "GSJA",
-        "GTBO", "HAIS", "HAKA", "HAMP", "HDFA", "HDIT", "HEAL", "HELI", "HERO", "HEXA", "HIKAM", "HINT", "HISP", "HKMU", "HLIT",
-        "HMAI", "HMPA", "HMSP", "HOKI", "HOMI", "HOTL", "HRTA", "HRUM", "IATA", "IBOS", "IBST", "ICBP", "ICON", "IDPR", "IKAN",
-        "IKBI", "IKHA", "IMAS", "IMJS", "IMPC", "INAF", "INCF", "INDF", "indo", "INDX", "INDY", "INKP", "INPC", "INPP", "INPS",
-        "INRU", "INTA", "INTD", "INTP", "IPAC", "IPCC", "IPCM", "IPOL", "IRRA", "ISAT", "ISSP", "ITMA", "ITMG", "JAWA", "JECC",
-        "JGLE", "JIHD", "JKON", "JKSW", "JMAS", "JPFA", "JRPT", "JSKY", "JSMR", "JSTB", "JTPE", "KAEF", "KICI", "KIJA", "KKGI",
-        "KLBF", "KLAS", "KMDS", "KOBX", "KOIN", "KOKA", "KOTA", "KPAL", "KPAS", "KPIG", "KREN", "KRNA", "KRAS", "KRAH", "KREI",
-        "LION", "LPCK", "LPKR", "LPLI", "LPPF", "LPPS", "LRN",  "LSIP", "LTLS", "LUCK", "LUMI", "MAIN", "MAMI", "MAPA", "MAPI",
-        "MARI", "MARK", "MASA", "MAYA", "MBAP", "MBSS", "MBTO", "MCOL", "MDIA", "MDKA", "MDKI", "MDLN", "MEDC", "MEGA", "MERK",
-        "META", "MFIN", "MGNA", "MHAX", "MICE", "MIDI", "MILA", "MINA", "MINK", "MIRA", "MITI", "MKNT", "MKPI", "MLBI", "MLIA",
-        "MLPL", "MLPT", "MMIX", "MNCN", "MPMX", "MPPA", "MRAT", "MRPK", "MSIN", "MSKY", "MTDL", "MTEL", "MTFN", "MTLA", "MTMH",
-        "MTPS", "MTRA", "MTSM", "MUTU", "MYOH", "MYOR", "MYTX", "NANO", "NASA", "NASI", "NATO", "NAIK", "NBHA", "NELY", "NETV",
-        "NFCX", "NICK", "NICL", "NIRO", "NISP", "NMSL", "NOBU", "NRCA", "NREI", "NTBK", "NUSA", "NVOM", "NZIA", "OASA", "OBMD",
-        "ODEC", "OILS", "OKAS", "OMRE", "OPMS", "PADI", "PALM", "PAMA", "PANB", "PANI", "PANR", "PANS", "PBID", "PBRX", "PBSA",
-        "PCAR", "PDES", "PEGE", "PEHA", "PGAS", "PGJO", "PGLI", "PICO", "PIHA", "PMMP", "PMJS", "PNBS", "PNIN", "PNLF", "PNSE",
-        "POLY", "POOL", "PORT", "POWR", "PPRI", "PPRE", "PPRO", "PRAS", "PRDA", "PRIM", "PRST", "PSAB", "PSDN", "PSGO", "PSSI",
-        "PTBA", "PTDU", "PTIS", "PUDP", "PURA", "PURE", "PURI", "PWON", "PYFA", "RAAM", "RACY", "RAFI", "RAJA", "RALS", "RANC",
-        "RBMS", "RCCC", "RELI", "REMD", "RICY", "RIGS", "RIMO", "RMKO", "ROCK", "RODA", "ROTI", "SAGE", "S固M", "SAIP", "SAME",
-        "SAMF", "SATU", "SBAT", "SCCO", "SCMA", "SCNP", "SDMU", "SDPC", "SDRA", "SEMA", "SFAN", "SGER", "SGIK", "SGRO", "SHID",
-        "SIAP", "SICO", "SIDO", "SILO", "SIMA", "SIMP", "SINI", "SIPD", "SKBM", "SKLT", "SMAR", "SMBR", "SMCB", "SMDM", "SMDR",
-        "SMGR", "SMIL", "SMKM", "SMMA", "SMRA", "SMRU", "SMSM", "SNLK", "SOCI", "SOFE", "SOHO", "SONA", "SPMA", "SPTO", "SRSN",
-        "SRTG", "SSIA", "SSMS", "SSTM", "STAR", "STAA", "SUGI", "SULI", "SUPR", "SURE", "SURYA", "SUSU", "TAIS", "TAMU", "TAMP",
-        "TAPG", "TARA", "TAXI", "TBIG", "TBMS", "TCID", "TCPI", "TEBE", "TECH", "TELE", "TENI", "TFAS", "TFCO", "TGKA", "TGRA",
-        "TIFA", "TINS", "TIRA", "TIRT", "TKIM", "TLKM", "TLDN", "TMAS", "TMPO", "TOBA", "TOGA", "TONS", "TOTAL", "TOTO", "TOWR",
-        "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN",
-        "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS",
-        "vone", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS",
+        "CANT", "CARE", "CARS", "CASA", "CASH", "CASS", "CATT", "CBDK", "CEKA", "CENT", "CESS", "CFIN", "CINT", "CITA", "CITY", 
+        "CLAY", "CLEO", "CLPI", "CMNP", "CMRY", "CNMA", "CNTX", "COAL", "COCO", "CPIN", "CPRI", "CPRO", "CSAP", "CSIS", "CSRA", 
+        "CTRA", "CTTH", "CUAN", "CYBER", "DAAZ", "DART", "DAYA", "DEAL", "DEFI", "DEWA", "DFAM", "DGIK", "DHCO", "DIGI", "DILD", 
+        "DIVA", "DKFT", "DLTA", "DMAS", "DMED", "DMMX", "DNAR", "DOMI", "DOOH", "DPNS", "DPUM", "DRMA", "DSSA", "DSFI", "DSNG", 
+        "DTAL", "DUTO", "DVLA", "DXJN", "DYAN", "EAST", "ECII", "EDII", "EKAD", "ELIT", "ELSA", "EMAL", "EMDE", "EMTK", "ENRG", 
+        "EPAC", "EPMT", "ERAA", "ERTX", "ESIP", "ESSA", "ESTA", "ETWA", "EXCL", "FAPA", "FAST", "FASW", "FEST", "FIKA", "FILM", 
+        "FINN", "FIRE", "FMII", "FPNI", "FORU", "FOTA", "FRAS", "FUJI", "GAMA", "GAMR", "GARA", "GCOAL", "GDST", "GDYR", "GEMS", 
+        "GGRM", "GHEO", "GIAA", "GJTL", "GLOB", "GMCW", "GMTD", "GOLD", "GOTO", "GPRA", "GPSO", "GRHA", "GRIA", "GRPM", "GSMF", 
+        "GSJA", "GTBO", "HAIS", "HAKA", "HAMP", "HDFA", "HDIT", "HEAL", "HELI", "HERO", "HEXA", "HIKAM", "HINT", "HISP", "HKMU", 
+        "HLIT", "HMAI", "HMPA", "HMSP", "HOKI", "HOMI", "HOTL", "HRTA", "HRUM", "IATA", "IBOS", "IBST", "ICBP", "ICON", "IDPR", 
+        "IKAN", "IKBI", "IKHA", "IMAS", "IMJS", "IMPC", "INAF", "INCF", "INDF", "INDO", "INDX", "INDY", "INKP", "INPC", "INPP", 
+        "INPS", "INRU", "INTA", "INTD", "INTP", "IPAC", "IPCC", "IPCM", "IPOL", "IRRA", "ISAT", "ISSP", "ITMA", "ITMG", "JAWA", 
+        "JECC", "JGLE", "JIHD", "JKON", "JKSW", "JMAS", "JPFA", "JRPT", "JSKY", "JSMR", "JSTB", "JTPE", "KAEF", "KICI", "KIJA", 
+        "KKGI", "KLBF", "KLAS", "KMDS", "KOBX", "KOIN", "KOKA", "KOTA", "KPAL", "KPAS", "KPIG", "KREN", "KRNA", "KRAS", "KRAH", 
+        "KREI", "LION", "LPCK", "LPKR", "LPLI", "LPPF", "LPPS", "LRN",  "LSIP", "LTLS", "LUCK", "LUMI", "MAIN", "MAMI", "MAPA", 
+        "MAPI", "MARI", "MARK", "MASA", "MAYA", "MBAP", "MBSS", "MBTO", "MCOL", "MDIA", "MDKA", "MDKI", "MDLN", "MEDC", "MEGA", 
+        "MERK", "META", "MFIN", "MGNA", "MHAX", "MICE", "MIDI", "MILA", "MINA", "MINK", "MIRA", "MITI", "MKNT", "MKPI", "MLBI", 
+        "MLIA", "MLPL", "MLPT", "MMIX", "MNCN", "MPMX", "MPPA", "MRAT", "MRPK", "MSIN", "MSKY", "MTDL", "MTEL", "MTFN", "MTLA", 
+        "MTMH", "MTPS", "MTRA", "MTSM", "MUTU", "MYOH", "MYOR", "MYTX", "NANO", "NASA", "NASI", "NATO", "NAIK", "NBHA", "NELY", 
+        "NETV", "NFCX", "NICK", "NICL", "NIRO", "NISP", "NMSL", "NOBU", "NRCA", "NREI", "NTBK", "NUSA", "NVOM", "NZIA", "OASA", 
+        "OBMD", "ODEC", "OILS", "OKAS", "OMRE", "OPMS", "PADI", "PALM", "PAMA", "PANB", "PANI", "PANR", "PANS", "PBID", "PBRX", 
+        "PBSA", "PCAR", "PDES", "PEGE", "PEHA", "PGAS", "PGJO", "PGLI", "PICO", "PIHA", "PMMP", "PMJS", "PNBS", "PNIN", "PNLF", 
+        "PNSE", "POLY", "POOL", "PORT", "POWR", "PPRI", "PPRE", "PPRO", "PRAS", "PRDA", "PRIM", "PRST", "PSAB", "PSDN", "PSGO", 
+        "PSSI", "PTBA", "PTDU", "PTIS", "PUDP", "PURA", "PURE", "PURI", "PWON", "PYFA", "RAAM", "RACY", "RAFI", "RAJA", "RALS", 
+        "RANC", "RBMS", "RCCC", "RELI", "REMD", "RICY", "RIGS", "RIMO", "RMKO", "ROCK", "RODA", "ROTI", "SAGE", "SAIP", "SAME", 
+        "SAMF", "SATU", "SBAT", "SCCO", "SCMA", "SCNP", "SDMU", "SDPC", "SDRA", "SEMA", "SFAN", "SGER", "SGIK", "SGRO", "SHID", 
+        "SIAP", "SICO", "SIDO", "SILO", "SIMA", "SIMP", "SINI", "SIPD", "SKBM", "SKLT", "SMAR", "SMBR", "SMCB", "SMDM", "SMDR", 
+        "SMGR", "SMIL", "SMKM", "SMMA", "SMRA", "SMRU", "SMSM", "SNLK", "SOCI", "SOFE", "SOHO", "SONA", "SPMA", "SPTO", "SRSN", 
+        "SRTG", "SSIA", "SSMS", "SSTM", "STAR", "STAA", "SUGI", "SULI", "SUPR", "SURE", "SURYA", "SUSU", "TAIS", "TAMU", "TAMP", 
+        "TAPG", "TARA", "TAXI", "TBIG", "TBMS", "TCID", "TCPI", "TEBE", "TECH", "TELE", "TENI", "TFAS", "TFCO", "TGKA", "TGRA", 
+        "TIFA", "TINS", "TIRA", "TIRT", "TKIM", "TLKM", "TLDN", "TMAS", "TMPO", "TOBA", "TOGA", "TONS", "TOTAL", "TOTO", "TOWR", 
+        "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN", 
+        "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS", 
+        "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
         "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE"
     ]
-    # Konversi otomatis ke format Yahoo Finance dan pastikan huruf besar
     return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
 
 master_tickers_jk = load_mega_market_tickers()
@@ -82,32 +80,30 @@ def clean_yf_dataframe(df):
     df.columns = [str(col).strip() for col in df.columns]
     return df
 
-# --- 4. CORE ENGINE MULTI-TIMEFRAME (SWING + SCALPING MOMENTUM) ---
+# --- 4. CORE ENGINE (SWING TRADING + ACCELERATION RADAR) ---
 def analyze_market_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
         
-        # PERBAIKAN VALIDASI: Mengambil data 3 bulan terakhir (interval harian untuk jaminan 24 jam)
+        # Penarikan data harian 3 bulan untuk jaminan akses 24 jam tanpa interupsi
         df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
         df = clean_yf_dataframe(df)
         
-        # Pelonggaran batas baris data dari 15 menjadi 4 agar seluruh emiten sepi/baru lolos render
+        # Validasi dilonggarkan ke < 4 baris agar emiten baru / kurang likuid tidak hilang
         if df is None or len(df) < 4 or 'Close' not in df.columns: 
             return None
         
-        # Penghitungan Indikator Baseline Tren Utama
+        # Perhitungan Matematika Indikator Pasar (EMA, MA, RSI, Volume)
         df['EMA9'] = ta.ema(df['Close'], length=9)
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
         df['RSI'] = ta.rsi(df['Close'], length=14)
         df['Vol_MA20'] = df['Volume'].rolling(window=20).mean()
         
-        # Perhitungan Stochastic untuk Wilayah Jenuh Jual/Beli
         stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=14, d=3)
         df['STOCHk'] = stoch['STOCHk_14_3_3'] if 'STOCHk_14_3_3' in stoch.columns else 50.0
         df['STOCHd'] = stoch['STOCHd_14_3_3'] if 'STOCHd_14_3_3' in stoch.columns else 50.0
         
-        # Ekstraksi Data Baris Terakhir (Live Terupdate)
         last_price = float(df['Close'].iloc[-1])
         last_ema9 = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
         last_ema20 = float(df['EMA20'].iloc[-1]) if not pd.isna(df['EMA20'].iloc[-1]) else last_price
@@ -118,14 +114,11 @@ def analyze_market_momentum(ticker):
         last_volume = float(df['Volume'].iloc[-1])
         last_vol_ma = float(df['Vol_MA20'].iloc[-1]) if not pd.isna(df['Vol_MA20'].iloc[-1]) else 1.0
         
-        # Perubahan Harga
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
-        
-        # Turnover Riil Berjalan (Satuan Miliar Rupiah)
         total_turnover_today = (last_price * last_volume)
         
-        # Klasifikasi Arah Tren Utama
+        # Klasifikasi Struktur Tren Pasar
         if last_price > last_ema20 and last_ema20 > last_ma50:
             trend_label = "🟩 Up-Trend"
         elif last_price < last_ema20 and last_ema20 < last_ma50:
@@ -135,20 +128,17 @@ def analyze_market_momentum(ticker):
             
         ticker_name = ticker.replace(".JK", "")
         
-        # DETEKSI TRIGGER AKSI (ACTIONABLE SIGNAL)
-        # 1. Kondisi Super Buy (Breakout Volume + Rebound dari Bottom)
+        # LOGIKA EVALUASI AKSI & AKSELERASI TRADING
         if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.2):
             action_signal = "🔥 SUPER BUY"
             stop_loss = round(min(last_ema9, last_ema20), 0)
             take_profit = round(last_price + ((last_price - stop_loss) * 1.5), 0)
             
-        # 2. Kondisi Oversold Buy (Rebound murni struktur bawah)
         elif last_k > last_d and (last_rsi < 30 or last_k < 20):
             action_signal = "🎯 BUY (Oversold)"
             stop_loss = round(last_price * 0.96, 0)
             take_profit = round(last_price * 1.06, 0)
             
-        # 3. Kondisi Sinyal Peringatan Jenuh Beli / Distribusi
         elif last_price < last_ema9 and last_k < last_d and last_rsi > 70:
             action_signal = "🚨 RISK (Jenuh Beli)"
             stop_loss = 0
@@ -176,7 +166,6 @@ def analyze_market_momentum(ticker):
 
 def run_mega_scanner(ticker_list):
     results = []
-    # ThreadPool Executor ditingkatkan kinerjanya ke 25 workers agar scan 300+ emiten selesai sekejap
     with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
         future_to_ticker = {executor.submit(analyze_market_momentum, t): t for t in ticker_list}
         for future in concurrent.futures.as_completed(future_to_ticker):
@@ -185,11 +174,11 @@ def run_mega_scanner(ticker_list):
                 results.append(res)
     return pd.DataFrame(results)
 
-# --- 5. INTERFACE PANEL UTAMA KONTROL & DASHBOARD ---
+# --- 5. INTERFACE PANEL UTAMA (PERBAIKAN BUG ST.COLUMNS) ---
 st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
-# Layout Tombol Sinkronisasi Atas
+# PERBAIKAN UTAMA: Mengisi nilai spesifik pada parameter st.columns() agar tidak memicu TypeError
 col_title1, col_title2 = st.columns()
 with col_title1:
     st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
@@ -201,7 +190,6 @@ with col_title2:
 with st.sidebar:
     st.header("⚙️ Panel Filter Pencarian")
     
-    # Filter Tipe Sinyal Langsung
     filter_mode = st.radio(
         "Saring Kategori Sinyal:",
         options=["Tampilkan Semua Emiten", "Hanya Sinyal BUY / SUPER BUY", "Hanya Struktur Up-Trend"]
@@ -209,7 +197,7 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Selektor Emiten Terbuka (Default langsung mengunci target prioritas Anda)
+    # Selektor default dikunci ke saham pantauan prioritas tinggi Anda
     saham_pilihan = st.multiselect(
         "Kustom Pilih / Ketik Kode Saham Tambahan:",
         options=master_tickers_clean,
@@ -221,20 +209,17 @@ with st.sidebar:
 
 # PROSES RENDERING DATA TABEL UTAMA
 if len(saham_pilihan) > 0:
-    with st.spinner("Sedang menembak server Yahoo Finance untuk kalkulasi indikator matematika bursa..."):
+    with st.spinner("Sedang memproses data teknikal pasar dari Yahoo Finance..."):
         df_radar = run_mega_scanner(saham_pilihan)
     
     if not df_radar.empty:
-        # Eksekusi Filter Sesuai Request Sidebar
         if filter_mode == "Hanya Sinyal BUY / SUPER BUY":
             df_radar = df_radar[df_radar["Actionable"].str.contains("BUY")]
         elif filter_mode == "Hanya Struktur Up-Trend":
             df_radar = df_radar[df_radar["Trend"].str.contains("Up-Trend")]
             
-        # Urutkan berdasarkan persentase kenaikan harga tertinggi
         df_radar = df_radar.sort_values(by="Change %", ascending=False)
         
-        # Fungsi Mewarnai Sel Tabel Secara Interaktif
         def style_radar_rows(row):
             styles = [''] * len(row)
             action = str(row['Actionable'])
@@ -275,7 +260,6 @@ if len(saham_pilihan) > 0:
                                           "Target TP": "Rp {:,.0f}"
                                       })
             
-            # Memunculkan Dataframe dengan Lebar Penuh Kontainer
             st.dataframe(styled_df, use_container_width=True, height=500)
         else:
             st.warning("⚠️ Tidak ada emiten dari daftar Anda yang lolos kriteria penyaringan filter saat ini.")
