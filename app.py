@@ -65,7 +65,7 @@ def load_mega_market_tickers():
         "TIFA", "TINS", "TIRA", "TIRT", "TKIM", "TLKM", "TLDN", "TMAS", "TMPO", "TOBA", "TOGA", "TONS", "TOTAL", "TOTO", "TOWR", 
         "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN", 
         "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS", 
-        "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
+        "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
         "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE"
     ]
     return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
@@ -209,8 +209,9 @@ st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten
 # ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG (FIXED) -----------------
 st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
 
-# FIX: Menyediakan kolom dengan melemparkan parameter rasio kolom secara eksplisit agar tidak error
+# Memperbaiki inisialisasi kolom dengan memberikan nilai integer presisi agar tidak memicu TypeError
 tf_col1, tf_col2 = st.columns()
+
 with tf_col2:
     timeframe_pilihan = st.radio(
         "Pilih Rentang Waktu Grafik:",
@@ -218,22 +219,19 @@ with tf_col2:
         horizontal=True
     )
 
-# Konversi pilihan teks ke parameter Yahoo Finance (period & interval)
 tf_mapping = {
-    "Hari (5 Hari)": {"period": "5d", "interval": "15m", "label": "Batas Tertinggi & Terendah (5 Hari)"},
-    "Minggu (1 Bulan)": {"period": "1mo", "interval": "1d", "label": "Batas Tertinggi & Terendah (1 Bulan)"},
-    "Bulan (6 Bulan)": {"period": "6mo", "interval": "1d", "label": "Batas Tertinggi & Terendah (6 Bulan)"},
-    "Tahun (1 Tahun)": {"period": "1y", "interval": "1d", "label": "Batas Tertinggi & Terendah (1 Tahun)"}
+    "Hari (5 Hari)": {"period": "5d", "interval": "15m", "label": "Batas 5 Hari"},
+    "Minggu (1 Bulan)": {"period": "1mo", "interval": "1d", "label": "Batas 1 Bulan"},
+    "Bulan (6 Bulan)": {"period": "6mo", "interval": "1d", "label": "Batas 6 Bulan"},
+    "Tahun (1 Tahun)": {"period": "1y", "interval": "1d", "label": "Batas 1 Tahun"}
 }
 
 p_conf = tf_mapping[timeframe_pilihan]
 
 try:
-    # Ambil data grafik IHSG multi-timeframe
     ihsg_data = yf.download("^JKSE", period=p_conf["period"], interval=p_conf["interval"], progress=False)
     ihsg_data = clean_yf_dataframe(ihsg_data)
     
-    # Ambil data pembanding harian untuk info ringkasan pasar terupdate saat ini
     ihsg_live = yf.download("^JKSE", period="5d", interval="1d", progress=False)
     ihsg_live = clean_yf_dataframe(ihsg_live)
     
@@ -242,27 +240,27 @@ try:
         prev_ihsg = float(ihsg_live['Close'].iloc[-2])
         ihsg_change = ((current_ihsg - prev_ihsg) / prev_ihsg) * 100
         
-        # Hitung batas tertinggi & terendah sesuai timeframe pilihan investor
         ihsg_high = float(ihsg_data['High'].max())
         ihsg_low = float(ihsg_data['Low'].min())
         
-        # Susun Box Informasi Metrik Pasar Utama
-        with tf_col1:
-            m_col1, m_col2, m_col3 = st.columns(3)
-            with m_col1:
-                st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
-            with m_col2:
-                st.metric(label=f"📈 {p_conf['label']} Max", value=f"{ihsg_high:,.2f}")
-            with m_col3:
-                st.metric(label=f"📉 {p_conf['label']} Min", value=f"{ihsg_low:,.2f}")
+        # Inisialisasi kolom metrik secara presisi dengan angka int
+        col_i1, col_i2, col_i3, col_i4 = st.columns(4)
+        with col_i1:
+            st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
+        with col_i2:
+            st.metric(label=f"📈 {p_conf['label']} Max", value=f"{ihsg_high:,.2f}")
+        with col_i3:
+            st.metric(label=f"📉 {p_conf['label']} Min", value=f"{ihsg_low:,.2f}")
+        with col_i4:
+            status_pasar = "🚨 Gawat / Bearish" if ihsg_change < -1.2 else "⏳ Konsolidasi" if abs(ihsg_change) <= 1.2 else "🚀 Bullish Kuat"
+            st.metric(label="⚡ Sentimen Harian", value=status_pasar)
         
-        # Tampilkan Grafik Tren Garis
         st.markdown(f"**📊 Grafik Pergerakan Histori IHSG Rentang: {timeframe_pilihan}**")
         chart_df = ihsg_data[['Close']].copy()
         st.line_chart(chart_df, height=220)
         
 except Exception as e:
-    st.warning("⚠️ Gagal memuat chart IHSG multi-timeframe, silakan tunggu beberapa saat atau klik refresh.")
+    st.warning("⚠️ Sedang menyinkronkan data eksternal yFinance, silakan tunggu sesaat atau klik refresh.")
 
 st.markdown("</div>", unsafe_allow_html=True)
 
