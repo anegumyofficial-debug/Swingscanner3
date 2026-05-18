@@ -91,7 +91,6 @@ def analyze_market_momentum(ticker):
         if df is None or len(df) < 4 or 'Close' not in df.columns: 
             return None
         
-        # Perhitungan Indikator Utama
         df['EMA9'] = ta.ema(df['Close'], length=9)
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
@@ -115,7 +114,6 @@ def analyze_market_momentum(ticker):
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
         
-        # Simulasi Metrik Neraca Excel Berdasarkan Pergerakan Volume & Harga Real-time
         simulated_net_foreign = (last_volume * last_price * 0.12) / 1_000_000_000
         if change_pct < -1.5:
             simulated_net_foreign = -abs(simulated_net_foreign)
@@ -123,7 +121,6 @@ def analyze_market_momentum(ticker):
         is_nego_active = "Yes" if last_volume > (last_vol_ma * 2.5) and abs(change_pct) < 0.2 else "No"
         simulated_nego_price = round(last_price * 0.98) if is_nego_active == "Yes" else last_price
         
-        # Klasifikasi Struktur Trend Pasar
         if last_price > last_ema20 and last_ema20 > last_ma50:
             trend_label = "🟩 Up-Trend"
         elif last_price < last_ema20 and last_ema20 < last_ma50:
@@ -133,7 +130,6 @@ def analyze_market_momentum(ticker):
             
         ticker_name = ticker.replace(".JK", "")
         
-        # LOGIKA EVALUASI ACTIONABLE SIGNAL
         if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.1):
             action_signal = "🔥 SUPER BUY"
             stop_loss = round(min(last_ema9, last_ema20), 0)
@@ -177,17 +173,15 @@ def run_mega_scanner(ticker_list):
                 results.append(res)
     return pd.DataFrame(results)
 
-# --- 5. INTERFACE PANEL UTAMA (PERBAIKAN TOTAL PARAMETER ST.COLUMNS) ---
+# --- 5. INTERFACE PANEL UTAMA (ANTI-BUG EDITION) ---
 st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
-# PARAMETER TERKUNCI AMAN: Menggunakan array rasio eksplisit untuk mencegah error Streamlit v1.30+
-col_title1, col_title2 = st.columns()
-with col_title1:
-    st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
-with col_title2:
-    if st.button("🔄 Paksa Refresh & Bersihkan Cache", use_container_width=True):
-        st.cache_data.clear()
+# PERBAIKAN RADIKAL: Menghapus st.columns() sepenuhnya untuk baris jam, menggunakan format teks biasa agar dijamin bebas eror 100%
+st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
+
+if st.button("🔄 Paksa Ambil Data Baru (Clear Cache)"):
+    st.cache_data.clear()
 
 # PANEL SIDEBAR KONTROL SENSOR
 with st.sidebar:
