@@ -7,22 +7,21 @@ import pytz
 import concurrent.futures
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Swing & Scalper Dashboard BEI", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Scalper Radar BEI - Full Edition", layout="wide", page_icon="⚡")
 
+# Mengunci jam server ke zona waktu WIB (Asia/Jakarta)
 wib_tz = pytz.timezone('Asia/Jakarta')
 wib_now = datetime.now(wib_tz)
 
-# --- 2. CUSTOM CSS UTK TAMPILAN PREMIUM ---
+# --- 2. CUSTOM CSS SCALPER ---
 st.markdown("""
     <style>
     .stApp { background-color: #0F172A; color: #E2E8F0; }
     div[data-testid="stMetricValue"] { font-size: 24px; font-weight: bold; color: #F8FAFC; }
-    .main-title { color: #38BDF8; font-weight: 800; padding-bottom: 5px; }
-    .sub-text { color: #94A3B8; font-size: 14px; margin-bottom: 20px; }
-    .card-dana { background-color: #1E293B; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
-    .card-ihsg { background-color: #1E293B; padding: 20px; border-radius: 12px; border-left: 5px solid #38BDF8; margin-bottom: 25px; }
+    .main-title { color: #38BDF8; font-weight: 800; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
+
 
 # --- 3. DATABASE MASTER EMITEN ---
 @st.cache_data(ttl=604800)
@@ -70,7 +69,7 @@ def load_mega_market_tickers():
         "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN", 
         "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS", 
         "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
-        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE", "PTRO", "BRAM", "IRSX", "WIFI", "KLBV","NCKL","BELI","ULTJ","TMPO", "DSSA","MDKA","RMKO","RMKE"
+        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE", "PTRO", "BRAM", "IRSX", "WIFI", "KLBV","NCKL","BELI","ULTJ", "TMPO","DSSA","MDKA","RMKO","RMKE"
     ]
     return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
 
@@ -86,329 +85,192 @@ def clean_yf_dataframe(df):
     df.columns = [str(col).strip() for col in df.columns]
     return df
 
-# --- 4. ENGINE ANALISIS UTAMA ---
-def analyze_market_momentum(ticker):
+# --- 4. ENGINE ANALISIS INTERDAY SCALPING & VALIDASI FILTER ---
+def analyze_scalping_momentum(ticker):
     try:
         formatted_ticker = ticker if ticker.endswith(".JK") else f"{ticker}.JK"
-        df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
-        df = clean_yf_dataframe(df)
         
-        if df is None or len(df) < 4 or 'Close' not in df.columns: 
+        # Mode Utama: Coba ambil data intraday 5 menit terlebih dahulu
+        df = yf.download(formatted_ticker, period="3d", interval="5m", progress=False)
+        df = clean_yf_dataframe(df)
+        is_fallback = False
+        
+        # Mode Cadangan: Jika di malam hari data 5m kosong, beralih ke data harian agar tidak eror
+        if df is None or len(df) < 15 or 'Close' not in df.columns:
+            df = yf.download(formatted_ticker, period="3mo", interval="1d", progress=False)
+            df = clean_yf_dataframe(df)
+            is_fallback = True
+            
+        if df is None or len(df) < 15 or 'Close' not in df.columns: 
             return None
         
-        df['EMA9'] = ta.ema(df['Close'], length=9)
-        df['EMA20'] = ta.ema(df['Close'], length=20)
-        df['MA50'] = ta.sma(df['Close'], length=50)
-        df['VWAP'] = ta.vwap(df['High'], df['Low'], df['Close'], df['Volume'])
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        df['Vol_MA20'] = df['Volume'].rolling(window=20).mean()
+        # Perhitungan Indikator Jalur VWAP / MA Cadangan
+        if not is_fallback:
+            cum_vol = df['Volume'].cumsum()
+            cum_vol_price = (df['Close'] * df['Volume']).cumsum()
+            df['VWAP'] = cum_vol_price / cum_vol
+        else:
+            # Di mode harian malam hari, VWAP digantikan perannya oleh EMA20 historis
+            df['VWAP'] = ta.ema(df['Close'], length=20)
         
+        # Stochastic Oscillator Cepat
         stoch = ta.stoch(df['High'], df['Low'], df['Close'], k=14, d=3)
-        df['STOCHk'] = stoch['STOCHk_14_3_3'] if 'STOCHk_14_3_3' in stoch.columns else 50.0
-        df['STOCHd'] = stoch['STOCHd_14_3_3'] if 'STOCHd_14_3_3' in stoch.columns else 50.0
+        df['STOCHk'] = stoch['STOCHk_14_3_3']
+        df['STOCHd'] = stoch['STOCHd_14_3_3']
         
+        df['EMA9'] = ta.ema(df['Close'], length=9)
+        df['Vol_MA20'] = df['Volume'].rolling(window=20).mean()
+        total_turnover_today = (df['Close'] * df['Volume']).sum()
+        
+        # Data Menit/Hari Terakhir
         last_price = float(df['Close'].iloc[-1])
         last_vwap = float(df['VWAP'].iloc[-1]) if not pd.isna(df['VWAP'].iloc[-1]) else last_price
-        last_ema9 = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
-        last_ema20 = float(df['EMA20'].iloc[-1]) if not pd.isna(df['EMA20'].iloc[-1]) else last_price
-        last_ma50 = float(df['MA50'].iloc[-1]) if not pd.isna(df['MA50'].iloc[-1]) else last_price
-        last_rsi = float(df['RSI'].iloc[-1]) if not pd.isna(df['RSI'].iloc[-1]) else 50.0
         last_k = float(df['STOCHk'].iloc[-1]) if not pd.isna(df['STOCHk'].iloc[-1]) else 50.0
         last_d = float(df['STOCHd'].iloc[-1]) if not pd.isna(df['STOCHd'].iloc[-1]) else 50.0
+        last_ema = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
         last_volume = float(df['Volume'].iloc[-1])
         last_vol_ma = float(df['Vol_MA20'].iloc[-1]) if not pd.isna(df['Vol_MA20'].iloc[-1]) else 1.0
         
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
         
-        if change_pct >= 0:
-            p_masuk = 50 + (min(change_pct * 5, 45))
-        else:
-            p_masuk = max(5, 50 - (abs(change_pct) * 5))
-        
-        p_masuk = max(5.0, min(95.0, p_masuk))
-        p_keluar = 100.0 - p_masuk
-        total_turnover_b = (last_volume * last_price) / 1_000_000_000 
-        est_foreign_buy = total_turnover_b * (p_masuk / 100.0) * 0.25
-        est_foreign_sell = total_turnover_b * (p_keluar / 100.0) * 0.25
-        net_foreign_b = est_foreign_buy - est_foreign_sell
-        net_foreign_avg = (est_foreign_buy + est_foreign_sell) / 2 if total_turnover_b > 0 else 0
-        
-        potensi_change_pct = (net_foreign_b / (last_vol_ma * last_price / 1_000_000_000 + 1)) * 10.0
-        if last_rsi > 75:  
-            potensi_change_pct -= 1.5
-        elif last_rsi < 25: 
-            potensi_change_pct += 1.5
-            
-        prediksi_harga_saham = last_price * (1 + (potensi_change_pct / 100.0))
-        if prediksi_harga_saham < 200:
-            prediksi_harga_saham = round(prediksi_harga_saham)
-        else:
-            prediksi_harga_saham = round(prediksi_harga_saham / 2) * 2 if prediksi_harga_saham < 500 else round(prediksi_harga_saham / 5) * 5
-
-        if net_foreign_b > 5.0 and change_pct > 1.0:
-            inst_flow = "🐋 Big Accum"
-        elif net_foreign_b > 0 and change_pct > 0:
-            inst_flow = "🐟 Small Accum"
-        elif net_foreign_b < -5.0 and change_pct < -1.0:
-            inst_flow = "🚨 Distribution"
-        else:
-            inst_flow = "⏳ Neutral"
-            
-        if last_volume > (last_vol_ma * 3.0):
-            ids_disclosure = "⚠️ Unusual Vol"
-        elif abs(change_pct) > 12.0:
-            ids_disclosure = "📢 Corp Action"
-        else:
-            ids_disclosure = "✅ Normal"
-            
-        is_nego_active = "Yes" if last_volume > (last_vol_ma * 2.5) and abs(change_pct) < 0.2 else "No"
-        simulated_nego_price = round(last_price * 0.98) if is_nego_active == "Yes" else last_price
-        
-        if last_price > last_ema20 and last_ema20 > last_ma50:
-            trend_label = "🟩 Up-Trend"
-        elif last_price < last_ema20 and last_ema20 < last_ma50:
-            trend_label = "🟥 Down-Trend"
-        else:
-            trend_label = "🟨 Sideways"
-            
         ticker_name = ticker.replace(".JK", "")
         
-        if last_price > last_ema9 and last_k > last_d and last_rsi < 45 and last_volume > (last_vol_ma * 1.1):
-            action_signal = "🔥 SUPER BUY"
-            stop_loss = round(min(last_ema9, last_ema20), 0)
-            take_profit = round(last_price + ((last_price - stop_loss) * 1.5), 0)
-        elif last_k > last_d and (last_rsi < 35 or last_k < 25):
-            action_signal = "🎯 BUY (Oversold)"
-            stop_loss = round(last_price * 0.95, 0)
-            take_profit = round(last_price * 1.05, 0)
-        elif last_price < last_ema9 and last_k < last_d and last_rsi > 70:
-            action_signal = "🚨 RISK (Jenuh Beli)"
-            stop_loss = 0
-            take_profit = 0
+        # Penilaian Validitas Volume dan Likuiditas
+        is_volume_spike = last_volume > (last_vol_ma * 1.3)
+        is_highly_liquid = total_turnover_today > 3_000_000_000  # Threshold disesuaikan ke 3B untuk fleksibilitas waktu luar bursa
+        
+        # LOGIKA ESTIMASI ARAH, STOP LOSS, & TAKE PROFIT
+        if last_price > last_vwap and last_price > last_ema and last_k > last_d and last_k < 50:
+            if is_volume_spike and is_highly_liquid:
+                direction = "🚀 STRONG UP (Siap Buy)"
+            else:
+                direction = "📈 UP MOMENTUM (Koleksi)"
+                
+            stop_loss_est = round(min(last_vwap, last_ema), 0)
+            risk_distance = max(last_price - stop_loss_est, last_price * 0.01)
+            take_profit_est = round(last_price + (risk_distance * 1.5), 0)
+            
+        elif last_price > last_vwap and last_k > last_d:
+            direction = "📈 UP MOMENTUM (Koleksi)"
+            stop_loss_est = round(last_vwap, 0)
+            risk_distance = max(last_price - stop_loss_est, last_price * 0.01)
+            take_profit_est = round(last_price + (risk_distance * 1.5), 0)
+            
+        elif last_price < last_ema and last_k < last_d and last_k > 65:
+            direction = "🚨 DUMP RISK (Jangan Haka)"
+            stop_loss_est = round(last_price * 0.99, 0)
+            take_profit_est = 0
+            
+        elif last_price < last_vwap:
+            direction = "📉 DOWN (Hindari)"
+            stop_loss_est = 0
+            take_profit_est = 0
         else:
-            action_signal = "⏳ Wait / Neutral"
-            stop_loss = 0
-            take_profit = 0
+            direction = "⏳ SIDEWAYS (Wait)"
+            stop_loss_est = round(last_price * 0.99, 0)
+            take_profit_est = round(last_price * 1.02, 0)
+            
+        # Catatan Penanda jika data beralih ke mode penutupan harian
+        if is_fallback:
+            direction += " [Hari Kemarin]"
             
         return {
             "Ticker": ticker_name,
-            "Price": last_price,
+            "Live Price": last_price,
             "Change %": round(change_pct, 2),
-            "VWAP Baseline": round(last_vwap, 0),
-            "Nego Price": simulated_nego_price,
-            "Potensi +/- (%)": round(potensi_change_pct, 2),
-            "Prediksi Harga": prediksi_harga_saham,
-            "RSI": round(last_rsi, 2),
-            "Inst Flow": inst_flow,
-            "Dana Masuk %": round(p_masuk, 1),
-            "Dana Keluar %": round(p_keluar, 1),
-            "Trend": trend_label,
-            "Actionable": action_signal,
-            "Proteksi SL": stop_loss,
-            "Target TP": take_profit,
-            "IDS Disclosure": ids_disclosure,
-            "IDS Nego": is_nego_active,
-            "Est For Buy (B)": round(est_foreign_buy, 2),
-            "Est For Sell (S)": round(est_foreign_sell, 2),
-            "Net Foreign (B)": round(net_foreign_b, 2),
-            "Net Foreign Avg": round(net_foreign_avg, 2)
+            "Turnover (B)": round(total_turnover_today / 1_000_000_000, 2),
+            "VWAP/MA Baseline": round(last_vwap, 0),
+            "Stoch %K": round(last_k, 2),
+            "Stoch %D": round(last_d, 2),
+            "Est. Arah": direction,
+            "Proteksi Stop Loss": stop_loss_est,
+            "Estimasi Take Profit": take_profit_est
         }
     except:
         return None
 
-def run_mega_scanner(ticker_list):
+def run_scalper_scanner(ticker_list):
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
-        future_to_ticker = {executor.submit(analyze_market_momentum, t): t for t in ticker_list}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        future_to_ticker = {executor.submit(analyze_scalping_momentum, t): t for t in ticker_list}
         for future in concurrent.futures.as_completed(future_to_ticker):
             res = future.result()
             if res is not None:
                 results.append(res)
     return pd.DataFrame(results)
-
-# --- 5. INTERFACE PANEL UTAMA ---
-st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
-st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia</p>", unsafe_allow_html=True)
-
-# ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG -----------------
-st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
-tf_col1, tf_col2 = st.columns(2)
-with tf_col2:
-    timeframe_pilihan = st.radio(
-        "Pilih Rentang Waktu Grafik:",
-        options=["Hari (5 Hari)", "Minggu (1 Bulan)", "Bulan (6 Bulan)", "Tahun (1 Tahun)"],
-        horizontal=True
-    )
-
-tf_mapping = {
-    "Hari (5 Hari)": {"period": "5d", "interval": "15m", "label": "Batas (5 Hari)"},
-    "Minggu (1 Bulan)": {"period": "1mo", "interval": "1d", "label": "Batas (1 Bulan)"},
-    "Bulan (6 Bulan)": {"period": "6mo", "interval": "1d", "label": "Batas (6 Bulan)"},
-    "Tahun (1 Tahun)": {"period": "1y", "interval": "1d", "label": "Batas (1 Tahun)"}
-}
-p_conf = tf_mapping[timeframe_pilihan]
-
-try:
-    ihsg_data = yf.download("^JKSE", period=p_conf["period"], interval=p_conf["interval"], progress=False)
-    ihsg_data = clean_yf_dataframe(ihsg_data)
-    ihsg_live = yf.download("^JKSE", period="7d", interval="1d", progress=False)
-    ihsg_live = clean_yf_dataframe(ihsg_live)
-    if ihsg_data is not None and not ihsg_data.empty:
-        current_ihsg = float(ihsg_live['Close'].iloc[-1])
-        prev_ihsg = float(ihsg_live['Close'].iloc[-2])
-        ihsg_change = ((current_ihsg - prev_ihsg) / prev_ihsg) * 100
-        ihsg_high = float(ihsg_data['High'].max())
-        ihsg_low = float(ihsg_data['Low'].min())
-        col_i1, col_i2, col_i3, col_i4 = st.columns(4)
-        with col_i1:
-            st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
-        with col_i2:
-            st.metric(label=f"📈 {p_conf['label']} Max", value=f"{ihsg_high:,.2f}")
-        with col_i3:
-            st.metric(label=f"📉 {p_conf['label']} Min", value=f"{ihsg_low:,.2f}")
-        with col_i4:
-            status_pasar = "🚨 Gawat / Bearish" if ihsg_change < -1.2 else "⏳ Konsolidasi" if abs(ihsg_change) <= 1.2 else "🚀 Bullish Kuat"
-            st.metric(label="⚡ Kondisi Sentimen Harian", value=status_pasar)
-        st.markdown(f"**📊 Grafik Pergerakan Histori IHSG Rentang: {timeframe_pilihan}**")
-        chart_df = ihsg_data[['Close']].copy()
-        st.line_chart(chart_df, height=220)
-except Exception as e:
-    st.warning("⚠️ Gagal memuat chart IHSG, silakan klik refresh.")
-
-st.markdown("</div>", unsafe_allow_html=True)
-st.write(f"⏰ Jam Sinkronisasi Terakhir: **{wib_now.strftime('%d-%m-%Y %H:%M:%S')} WIB** (Delay Yahoo Finance ±10-15 Menit)")
-
+    
+st.write(f"⏰ Jam Sinkronisasi Terakhir: **{wib_now.strftime('%d-%m-%Y %H:%M:%S')} WIB** (Zona Waktu Terkunci Asia/Jakarta)")
 if st.button("🔄 Paksa Ambil Data Baru (Clear Cache)"):
     st.cache_data.clear()
+    
+# --- 5. INTERFACE PANEL KONTROL & SIDEBAR ---
+st.markdown("<h1 class='main-title'>⚡ Scalper Radar Pro (Sinyal Siap Buy & Target TP/SL)</h1>", unsafe_allow_html=True)
 
-# PANEL SIDEBAR
+col_title1, col_title2 = st.columns(2)
+with col_title1:
+    st.write(f"Terakhir Sinkron: {datetime.now().strftime('%H:%M:%S')} WIB")
+with col_title2:
+    if st.button("🔄 Tembak Refresh Data", use_container_width=True):
+        st.cache_data.clear()
+
 with st.sidebar:
-    st.header("⚙️ Panel Filter Pencarian")
-    filter_mode = st.radio(
-        "Saring Kategori Sinyal:",
-        options=["Tampilkan Semua Emiten", "Hanya Sinyal BUY / SUPER BUY", "Hanya Struktur Up-Trend"]
-    )
+    st.header("⚙️ Filter Validasi Pasar")
+    only_ready_to_buy = st.checkbox("🎯 Hanya Tampilkan Sinyal SIAP BUY", value=False)
     st.markdown("---")
     saham_pilihan = st.multiselect(
-        "Kustom Pilih / Ketik Kode Saham Tambahan:",
-        options=master_tickers_clean,
-        default=["BOLA","FILM","NIRO","WAPO","CARE","CTTH","PANS","BPII","BUMI","BBCA","BBRI","BBNI","BMRI","TLKM","BDMN","IMJS","IRSX","DSSA"])
+        "Pilih Emiten Pantauan:", 
+        options=master_tickers_clean, 
+        default=["AADI", "BBCA", "BBRI", "BBNI", "BBTN", "INDF", "ICBP", "CBDK", "CMRY", "AMRT", "ANTM", "KLBF", "KAEF", "INKP", "ITMG", "UNTR","GGRM","SGRO","DSSA","HRTA","IRSX", "WIFI","MDKA","RMKO","RMKE","KLBV","BRMS","BUVA","CPIN","ADRO","BUMI","PTRO","ENRG","JPFA","FILM","MYOR","NCKL","BELI","ULTJ","TMPO"])
 
-# RENDERING TABEL UTAMA & METRIK PERSENTASE DANA
 if len(saham_pilihan) > 0:
-    with st.spinner("Sedang memproses bandarmologi dan data bursa..."):
-        df_radar = run_mega_scanner(saham_pilihan)
+    df_scalp = run_scalper_scanner(saham_pilihan)
     
-    if not df_radar.empty:
-        avg_masuk = float(df_radar["Dana Masuk %"].mean())
-        avg_keluar = 100.0 - avg_masuk
-        st.markdown(f"""
-        <div class='card-dana'>
-            <div style='display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px;'>
-                <span style='color: #4ADE80;'>🟢 Rata-rata Dana Masuk: {avg_masuk:.1f}%</span>
-                <span style='color: #F87171;'>🔴 Rata-rata Dana Keluar: {avg_keluar:.1f}%</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.progress(avg_masuk / 100.0)
-        st.markdown("<br>", unsafe_allow_html=True)
+    if not df_scalp.empty:
+        if only_ready_to_buy:
+            df_scalp = df_scalp[df_scalp["Est. Arah"].str.contains("STRONG UP|UP MOMENTUM")]
         
-        if filter_mode == "Hanya Sinyal BUY / SUPER BUY":
-            df_radar = df_radar[df_radar["Actionable"].str.contains("BUY")]
-        elif filter_mode == "Hanya Struktur Up-Trend":
-            df_radar = df_radar[df_radar["Trend"].str.contains("Up-Trend")]
-            
-        df_radar = df_radar.sort_values(by=["Dana Masuk %", "Net Foreign Avg"], ascending=[False, False])
+        df_scalp = df_scalp.sort_values(by="Change %", ascending=False)
         
-        # --- FUNGSI STYLE ---
-        def style_radar_rows(row):
+        def style_scalper(row):
             styles = [''] * len(row)
-            try:
-                idx_action = row.index.get_loc('Actionable')
-                idx_trend = row.index.get_loc('Trend')
-                idx_masuk = row.index.get_loc('Dana Masuk %')
-                idx_keluar = row.index.get_loc('Dana Keluar %')
-                idx_potensi = row.index.get_loc('Potensi +/- (%)')
-                idx_prediksi = row.index.get_loc('Prediksi Harga')
-                idx_vwap = row.index.get_loc('VWAP Baseline')
-                
-                styles[idx_masuk] = 'color: #4ADE80; font-weight: bold;'
-                styles[idx_keluar] = 'color: #F87171;'
-                
-                if row['Price'] > row['VWAP Baseline']:
-                    styles[idx_vwap] = 'color: #4ADE80; font-weight: bold;'
-                else:
-                    styles[idx_vwap] = 'color: #F87171; font-weight: bold;'
-
-                if float(row['Potensi +/- (%)']) > 0:
-                    styles[idx_potensi] = 'color: #22C55E; font-weight: bold; background-color: #052E16;'
-                    styles[idx_prediksi] = 'color: #4ADE80; font-weight: bold;'
-                elif float(row['Potensi +/- (%)']) < 0:
-                    styles[idx_potensi] = 'color: #EF4444; font-weight: bold; background-color: #451A03;'
-                    styles[idx_prediksi] = 'color: #F87171; font-weight: bold;'
-                
-                if "SUPER BUY" in str(row['Actionable']):
-                    styles[idx_action] = 'background-color: #15803D; color: white; font-weight: bold;'
-                elif "BUY" in str(row['Actionable']):
-                    styles[idx_action] = 'background-color: #166534; color: #BBF7D0;'
-                    
-                if "Up-Trend" in str(row['Trend']): styles[idx_trend] = 'color: #4ADE80;'
-                elif "Down-Trend" in str(row['Trend']): styles[idx_trend] = 'color: #F87171;'
-            except: pass
+            arah = str(row['Est. Arah'])
+            idx_arah = row.index.get_loc('Est. Arah')
+            idx_sl = row.index.get_loc('Proteksi Stop Loss')
+            idx_tp = row.index.get_loc('Estimasi Take Profit')
+            
+            if "STRONG UP" in arah:
+                styles[idx_arah] = 'background-color: #047857; color: white; font-weight: bold;'
+                styles[idx_tp] = 'color: #34D399; font-weight: bold;'
+            elif "UP MOMENTUM" in arah:
+                styles[idx_arah] = 'background-color: #065F46; color: #A7F3D0;'
+                styles[idx_tp] = 'color: #34D399;'
+            elif "DUMP RISK" in arah:
+                styles[idx_arah] = 'background-color: #991B1B; color: white; font-weight: bold;'
+                styles[idx_sl] = 'color: #F87171; font-weight: bold;'
             return styles
 
-        if not df_radar.empty:
-            styled_df = df_radar.style.apply(style_radar_rows, axis=1)\
+        if not df_scalp.empty:
+            styled_df = df_scalp.style.apply(style_scalper, axis=1)\
                                       .format({
-                                          "Price": "Rp {:,.0f}",
+                                          "Live Price": "Rp {:,.0f}",
                                           "Change %": "{:+.2f}%",
-                                          "VWAP Baseline": "Rp {:,.0f}",
-                                          "Nego Price": "Rp {:,.0f}",
-                                          "Potensi +/- (%)": "{:+.2f}%",
-                                          "Prediksi Harga": "Rp {:,.0f}",
-                                          "RSI": "{:.2f}",
-                                          "Dana Masuk %": "{:.1f}%",
-                                          "Dana Keluar %": "{:.1f}%",
-                                          "Proteksi SL": "Rp {:,.0f}",
-                                          "Target TP": "Rp {:,.0f}",
-                                          "Est For Buy (B)": "{:.2f} B",
-                                          "Est For Sell (S)": "{:.2f} B",
-                                          "Net Foreign (B)": "{:+.2f} B",
-                                          "Net Foreign Avg": "{:.2f} B"
+                                          "Turnover (B)": "{:,.2f} B",
+                                          "VWAP/MA Baseline": "Rp {:,.0f}",
+                                          "Stoch %K": "{:.2f}",
+                                          "Stoch %D": "{:.2f}",
+                                          "Proteksi Stop Loss": "Rp {:,.0f}",
+                                          "Estimasi Take Profit": "Rp {:,.0f}"
                                       })
-            st.dataframe(styled_df, use_container_width=True, height=520)
-        
-        # --- 6. TABEL REKOMENDASI STRATEGI ---
-        st.markdown("### 🎯 Panduan Eksekusi: Probabilitas & Waktu Ideal Serok")
-        data_panduan = {
-            "Kategori Sinyal": ["🔥 SUPER BUY", "🎯 BUY (Oversold)", "⏳ Wait / Neutral", "🚨 RISK (Jenuh Beli)"],
-            "Gaya Trading": ["Scalping / Quick Swing", "Swing Trading", "Hold / Observasi", "Profit Taking"],
-            "Masa Trading": ["1 - 3 Hari", "3 - 10 Hari", "N/A", "Exit Segera"],
-            "Probabilitas": ["Sangat Tinggi", "Tinggi", "Sedang", "Rendah"],
-            "Ideal Waktu Serok": ["Pre-Closing (15:50) / Pembukaan", "Istirahat Siang / Menjelang Penutupan", "N/A", "Hindari Entry"]
-        }
-        df_panduan = pd.DataFrame(data_panduan)
-        st.table(df_panduan)
-        
-        # --- TABEL TAMBAHAN MATRIKS KEPUTUSAN ---
-        st.markdown("### 📋 Matriks Pengambilan Keputusan: Tren vs. Sinyal")
-        matriks_data = {
-            "Tren": ["Up-Trend", "Up-Trend", "Down-Trend", "Sideways"],
-            "Sinyal": ["SUPER BUY", "RISK (Jenuh Beli)", "SUPER BUY", "Neutral"],
-            "Tindakan Utama": ["Aggressive Buy (Accumulate)", "Profit Taking / Hold", "Cicil Beli (Spekulatif & Ketat SL)", "Skip / Wait & See"]
-        }
-        df_matriks = pd.DataFrame(matriks_data)
-        st.table(df_matriks)
-        
-        st.info("""
-        💡 **Panduan Waktu Eksekusi (Serok):**
-        * **Saat Pembukaan (09:00 - 09:15):** Ideal untuk *Scalper* menangkap momentum *gap* harga. Pantau *Unusual Vol*.
-        * **Istirahat Siang (11:30 - 12:00):** Waktu terbaik untuk mengamati apakah akumulasi berlanjut. Jika harga bertahan di atas VWAP, posisi cukup aman untuk di-*hold*.
-        * **Menjelang Penutupan (15:45 - 16:00):** Paling ideal untuk *Swing Trader*. Jika sinyal 'SUPER BUY' muncul di menit-menit akhir, probabilitas kenaikan besok pagi sangat tinggi.
+            
+            st.dataframe(styled_df, use_container_width=True, height=450)
+        else:
+            st.warning("⚠️ Tidak ada emiten yang lolos filter validasi ketat 'Siap Buy' saat ini.")
+            
+        st.markdown("""
+        ### 💡 Aturan Pembacaan Dashboard Adaptif:
+        * **[Hari Kemarin]:** Jika tanda ini muncul di kolom arah, artinya bursa sedang tutup/data menitan kosong, dan dashboard otomatis menampilkan data penutupan hari bursa terakhir agar Anda tetap bisa melakukan analisis malam hari.
+        * **Turnover (B):** Mengukur nilai transaksi riil dalam satuan Miliar Rupiah untuk menyaring pergerakan palsu bandar lokal.
         """)
-        
     else:
-        st.warning("⚠️ Tidak ada emiten dari daftar Anda yang lolos kriteria filter saat ini.")
-else:
-    st.info("👋 Silakan pilih atau tambahkan minimal 1 kode emiten pada kolom sidebar untuk memulai radar.")
+        st.error("Gagal menarik data pasar dari Yahoo Finance. Silakan coba tekan tombol refresh di atas beberapa saat lagi.")
