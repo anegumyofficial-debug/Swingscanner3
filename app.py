@@ -3,14 +3,10 @@ import pandas as pd
 import yfinance as yf
 import pandas_ta as ta
 from datetime import datetime
-import pytz  
 import concurrent.futures
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Swing & Scalper Dashboard BEI", layout="wide", page_icon="📈")
-
-wib_tz = pytz.timezone('Asia/Jakarta')
-wib_now = datetime.now(wib_tz)
 
 # --- 2. CUSTOM CSS UTK TAMPILAN PREMIUM ---
 st.markdown("""
@@ -70,7 +66,7 @@ def load_mega_market_tickers():
         "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN", 
         "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS", 
         "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
-        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE", "PTRO", "BRAM", "IRSX", "WIFI", "KLBV","NCKL","BELI","ULTJ","TMPO", "DSSA","MDKA","RMKO","RMKE"
+        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE", "PTRO", "BRAM"
     ]
     return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
 
@@ -99,7 +95,6 @@ def analyze_market_momentum(ticker):
         df['EMA9'] = ta.ema(df['Close'], length=9)
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
-        df['VWAP'] = ta.vwap(df['High'], df['Low'], df['Close'], df['Volume'])
         df['RSI'] = ta.rsi(df['Close'], length=14)
         df['Vol_MA20'] = df['Volume'].rolling(window=20).mean()
         
@@ -108,7 +103,6 @@ def analyze_market_momentum(ticker):
         df['STOCHd'] = stoch['STOCHd_14_3_3'] if 'STOCHd_14_3_3' in stoch.columns else 50.0
         
         last_price = float(df['Close'].iloc[-1])
-        last_vwap = float(df['VWAP'].iloc[-1]) if not pd.isna(df['VWAP'].iloc[-1]) else last_price
         last_ema9 = float(df['EMA9'].iloc[-1]) if not pd.isna(df['EMA9'].iloc[-1]) else last_price
         last_ema20 = float(df['EMA20'].iloc[-1]) if not pd.isna(df['EMA20'].iloc[-1]) else last_price
         last_ma50 = float(df['MA50'].iloc[-1]) if not pd.isna(df['MA50'].iloc[-1]) else last_price
@@ -128,29 +122,16 @@ def analyze_market_momentum(ticker):
         
         p_masuk = max(5.0, min(95.0, p_masuk))
         p_keluar = 100.0 - p_masuk
-        total_turnover_b = (last_volume * last_price) / 1_000_000_000 
-        est_foreign_buy = total_turnover_b * (p_masuk / 100.0) * 0.25
-        est_foreign_sell = total_turnover_b * (p_keluar / 100.0) * 0.25
-        net_foreign_b = est_foreign_buy - est_foreign_sell
-        net_foreign_avg = (est_foreign_buy + est_foreign_sell) / 2 if total_turnover_b > 0 else 0
         
-        potensi_change_pct = (net_foreign_b / (last_vol_ma * last_price / 1_000_000_000 + 1)) * 10.0
-        if last_rsi > 75:  
-            potensi_change_pct -= 1.5
-        elif last_rsi < 25: 
-            potensi_change_pct += 1.5
+        simulated_net_foreign = (last_volume * last_price * 0.12) / 1_000_000_000
+        if change_pct < -1.0:
+            simulated_net_foreign = -abs(simulated_net_foreign)
             
-        prediksi_harga_saham = last_price * (1 + (potensi_change_pct / 100.0))
-        if prediksi_harga_saham < 200:
-            prediksi_harga_saham = round(prediksi_harga_saham)
-        else:
-            prediksi_harga_saham = round(prediksi_harga_saham / 2) * 2 if prediksi_harga_saham < 500 else round(prediksi_harga_saham / 5) * 5
-
-        if net_foreign_b > 5.0 and change_pct > 1.0:
+        if simulated_net_foreign > 15.0 and change_pct > 1.0:
             inst_flow = "🐋 Big Accum"
-        elif net_foreign_b > 0 and change_pct > 0:
+        elif simulated_net_foreign > 0 and change_pct > 0:
             inst_flow = "🐟 Small Accum"
-        elif net_foreign_b < -5.0 and change_pct < -1.0:
+        elif simulated_net_foreign < -15.0 and change_pct < -1.0:
             inst_flow = "🚨 Distribution"
         else:
             inst_flow = "⏳ Neutral"
@@ -195,24 +176,18 @@ def analyze_market_momentum(ticker):
             "Ticker": ticker_name,
             "Price": last_price,
             "Change %": round(change_pct, 2),
-            "VWAP Baseline": round(last_vwap, 0),
-            "Nego Price": simulated_nego_price,
-            "Potensi +/- (%)": round(potensi_change_pct, 2),
-            "Prediksi Harga": prediksi_harga_saham,
-            "RSI": round(last_rsi, 2),
+            "Net For (B)": round(simulated_net_foreign, 2),
             "Inst Flow": inst_flow,
+            "IDS Disclosure": ids_disclosure,
             "Dana Masuk %": round(p_masuk, 1),
             "Dana Keluar %": round(p_keluar, 1),
+            "IDS Nego": is_nego_active,
+            "Nego Price": simulated_nego_price,
+            "RSI": round(last_rsi, 2),
             "Trend": trend_label,
             "Actionable": action_signal,
             "Proteksi SL": stop_loss,
-            "Target TP": take_profit,
-            "IDS Disclosure": ids_disclosure,
-            "IDS Nego": is_nego_active,
-            "Est For Buy (B)": round(est_foreign_buy, 2),
-            "Est For Sell (S)": round(est_foreign_sell, 2),
-            "Net Foreign (B)": round(net_foreign_b, 2),
-            "Net Foreign Avg": round(net_foreign_avg, 2)
+            "Target TP": take_profit
         }
     except:
         return None
@@ -229,10 +204,12 @@ def run_mega_scanner(ticker_list):
 
 # --- 5. INTERFACE PANEL UTAMA ---
 st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
-st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia</p>", unsafe_allow_html=True)
+st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
 # ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG -----------------
 st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
+
+# PERBAIKAN: Memasukkan parameter angka 2 ke st.columns(2) agar tidak memicu TypeError
 tf_col1, tf_col2 = st.columns(2)
 with tf_col2:
     timeframe_pilihan = st.radio(
@@ -241,25 +218,35 @@ with tf_col2:
         horizontal=True
     )
 
+# Konversi pilihan teks ke parameter Yahoo Finance (period & interval)
 tf_mapping = {
     "Hari (5 Hari)": {"period": "5d", "interval": "15m", "label": "Batas (5 Hari)"},
     "Minggu (1 Bulan)": {"period": "1mo", "interval": "1d", "label": "Batas (1 Bulan)"},
     "Bulan (6 Bulan)": {"period": "6mo", "interval": "1d", "label": "Batas (6 Bulan)"},
     "Tahun (1 Tahun)": {"period": "1y", "interval": "1d", "label": "Batas (1 Tahun)"}
 }
+
 p_conf = tf_mapping[timeframe_pilihan]
 
 try:
+    # Tarik data multi-timeframe berdasarkan input user
     ihsg_data = yf.download("^JKSE", period=p_conf["period"], interval=p_conf["interval"], progress=False)
     ihsg_data = clean_yf_dataframe(ihsg_data)
-    ihsg_live = yf.download("^JKSE", period="7d", interval="1d", progress=False)
+    
+    # Tarik data harian pembanding untuk info kartu metrik terupdate saat ini
+    ihsg_live = yf.download("^JKSE", period="5d", interval="1d", progress=False)
     ihsg_live = clean_yf_dataframe(ihsg_live)
+    
     if ihsg_data is not None and not ihsg_data.empty:
         current_ihsg = float(ihsg_live['Close'].iloc[-1])
         prev_ihsg = float(ihsg_live['Close'].iloc[-2])
         ihsg_change = ((current_ihsg - prev_ihsg) / prev_ihsg) * 100
+        
+        # Hitung batas tertinggi & terendah sesuai range waktu yang dipilih user
         ihsg_high = float(ihsg_data['High'].max())
         ihsg_low = float(ihsg_data['Low'].min())
+        
+        # PERBAIKAN: Mengisi argumen jumlah kolom agar aman
         col_i1, col_i2, col_i3, col_i4 = st.columns(4)
         with col_i1:
             st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
@@ -270,14 +257,18 @@ try:
         with col_i4:
             status_pasar = "🚨 Gawat / Bearish" if ihsg_change < -1.2 else "⏳ Konsolidasi" if abs(ihsg_change) <= 1.2 else "🚀 Bullish Kuat"
             st.metric(label="⚡ Kondisi Sentimen Harian", value=status_pasar)
+        
+        # Rendering Chart Garis Historis IHSG Sesuai Filter
         st.markdown(f"**📊 Grafik Pergerakan Histori IHSG Rentang: {timeframe_pilihan}**")
         chart_df = ihsg_data[['Close']].copy()
         st.line_chart(chart_df, height=220)
+        
 except Exception as e:
-    st.warning("⚠️ Gagal memuat chart IHSG, silakan klik refresh.")
+    st.warning("⚠️ Gagal memuat chart IHSG multi-timeframe, silakan tunggu beberapa saat atau klik refresh.")
 
 st.markdown("</div>", unsafe_allow_html=True)
-st.write(f"⏰ Jam Sinkronisasi Terakhir: **{wib_now.strftime('%d-%m-%Y %H:%M:%S')} WIB** (Delay Yahoo Finance ±10-15 Menit)")
+
+st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
 
 if st.button("🔄 Paksa Ambil Data Baru (Clear Cache)"):
     st.cache_data.clear()
@@ -293,7 +284,7 @@ with st.sidebar:
     saham_pilihan = st.multiselect(
         "Kustom Pilih / Ketik Kode Saham Tambahan:",
         options=master_tickers_clean,
-        default=["NZIA","ESIP","ESSA","TLKM","AADI", "BBCA", "BBRI", "BBNI", "BBTN", "INDF", "ICBP", "CBDK", "CMRY", "AMRT", "ANTM", "KLBF", "KAEF", "INKP", "ITMG", "UNTR", "GGRM", "SGRO","HRTA","BRMS","BUVA","CPIN","ADRO","BUMI","PTRO","ENRG","JPFA","FILM","MYOR","NCKL","BELI","ULTJ","DSSA","IRSX", "WIFI","MDKA","RMKO","RMKE", "KLBV", "TMPO"])
+        default=["BBCA", "BBRI", "BBNI", "BBTN", "INDF", "ICBP", "CBDK", "CMRY", "AMRT", "ANTM", "KLBF", "KAEF", "INKP", "ITMG", "UNTR", "GGRM"])
 
 # RENDERING TABEL UTAMA & METRIK PERSENTASE DANA
 if len(saham_pilihan) > 0:
@@ -303,6 +294,7 @@ if len(saham_pilihan) > 0:
     if not df_radar.empty:
         avg_masuk = float(df_radar["Dana Masuk %"].mean())
         avg_keluar = 100.0 - avg_masuk
+        
         st.markdown(f"""
         <div class='card-dana'>
             <div style='display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px;'>
@@ -319,43 +311,40 @@ if len(saham_pilihan) > 0:
         elif filter_mode == "Hanya Struktur Up-Trend":
             df_radar = df_radar[df_radar["Trend"].str.contains("Up-Trend")]
             
-        df_radar = df_radar.sort_values(by=["Dana Masuk %", "Net Foreign Avg"], ascending=[False, False])
+        df_radar = df_radar.sort_values(by="Change %", ascending=False)
         
-        # --- FUNGSI STYLE ---
         def style_radar_rows(row):
             styles = [''] * len(row)
-            try:
-                idx_action = row.index.get_loc('Actionable')
-                idx_trend = row.index.get_loc('Trend')
-                idx_masuk = row.index.get_loc('Dana Masuk %')
-                idx_keluar = row.index.get_loc('Dana Keluar %')
-                idx_potensi = row.index.get_loc('Potensi +/- (%)')
-                idx_prediksi = row.index.get_loc('Prediksi Harga')
-                idx_vwap = row.index.get_loc('VWAP Baseline')
+            action = str(row['Actionable'])
+            trend = str(row['Trend'])
+            flow = str(row['Inst Flow'])
+            disc = str(row['IDS Disclosure'])
+            
+            idx_action = row.index.get_loc('Actionable')
+            idx_trend = row.index.get_loc('Trend')
+            idx_flow = row.index.get_loc('Inst Flow')
+            idx_disc = row.index.get_loc('IDS Disclosure')
+            idx_masuk = row.index.get_loc('Dana Masuk %')
+            idx_keluar = row.index.get_loc('Dana Keluar %')
+            
+            styles[idx_masuk] = 'color: #4ADE80; font-weight: bold;'
+            styles[idx_keluar] = 'color: #F87171;'
+            
+            if "SUPER BUY" in action:
+                styles[idx_action] = 'background-color: #15803D; color: white; font-weight: bold;'
+            elif "BUY" in action:
+                styles[idx_action] = 'background-color: #166534; color: #BBF7D0;'
                 
-                styles[idx_masuk] = 'color: #4ADE80; font-weight: bold;'
-                styles[idx_keluar] = 'color: #F87171;'
+            if "Up-Trend" in trend or "Accum" in flow:
+                if "Up-Trend" in trend: styles[idx_trend] = 'color: #4ADE80;'
+                if "Accum" in flow: styles[idx_flow] = 'color: #4ADE80; font-weight: bold;'
+            elif "Down-Trend" in trend or "Distribution" in flow:
+                if "Down-Trend" in trend: styles[idx_trend] = 'color: #F87171;'
+                if "Distribution" in flow: styles[idx_flow] = 'color: #F87171; font-weight: bold;'
                 
-                if row['Price'] > row['VWAP Baseline']:
-                    styles[idx_vwap] = 'color: #4ADE80; font-weight: bold;'
-                else:
-                    styles[idx_vwap] = 'color: #F87171; font-weight: bold;'
-
-                if float(row['Potensi +/- (%)']) > 0:
-                    styles[idx_potensi] = 'color: #22C55E; font-weight: bold; background-color: #052E16;'
-                    styles[idx_prediksi] = 'color: #4ADE80; font-weight: bold;'
-                elif float(row['Potensi +/- (%)']) < 0:
-                    styles[idx_potensi] = 'color: #EF4444; font-weight: bold; background-color: #451A03;'
-                    styles[idx_prediksi] = 'color: #F87171; font-weight: bold;'
+            if "Unusual" in disc or "Action" in disc:
+                styles[idx_disc] = 'color: #FBBF24; font-weight: bold;'
                 
-                if "SUPER BUY" in str(row['Actionable']):
-                    styles[idx_action] = 'background-color: #15803D; color: white; font-weight: bold;'
-                elif "BUY" in str(row['Actionable']):
-                    styles[idx_action] = 'background-color: #166534; color: #BBF7D0;'
-                    
-                if "Up-Trend" in str(row['Trend']): styles[idx_trend] = 'color: #4ADE80;'
-                elif "Down-Trend" in str(row['Trend']): styles[idx_trend] = 'color: #F87171;'
-            except: pass
             return styles
 
         if not df_radar.empty:
@@ -363,52 +352,17 @@ if len(saham_pilihan) > 0:
                                       .format({
                                           "Price": "Rp {:,.0f}",
                                           "Change %": "{:+.2f}%",
-                                          "VWAP Baseline": "Rp {:,.0f}",
-                                          "Nego Price": "Rp {:,.0f}",
-                                          "Potensi +/- (%)": "{:+.2f}%",
-                                          "Prediksi Harga": "Rp {:,.0f}",
-                                          "RSI": "{:.2f}",
+                                          "Net For (B)": "{:+.2f} B",
                                           "Dana Masuk %": "{:.1f}%",
                                           "Dana Keluar %": "{:.1f}%",
+                                          "Nego Price": "Rp {:,.0f}",
+                                          "RSI": "{:.2f}",
                                           "Proteksi SL": "Rp {:,.0f}",
-                                          "Target TP": "Rp {:,.0f}",
-                                          "Est For Buy (B)": "{:.2f} B",
-                                          "Est For Sell (S)": "{:.2f} B",
-                                          "Net Foreign (B)": "{:+.2f} B",
-                                          "Net Foreign Avg": "{:.2f} B"
+                                          "Target TP": "Rp {:,.0f}"
                                       })
+            
             st.dataframe(styled_df, use_container_width=True, height=520)
-        
-        # --- 6. TABEL REKOMENDASI STRATEGI ---
-        st.markdown("### 🎯 Panduan Eksekusi: Probabilitas & Waktu Ideal Serok")
-        data_panduan = {
-            "Kategori Sinyal": ["🔥 SUPER BUY", "🎯 BUY (Oversold)", "⏳ Wait / Neutral", "🚨 RISK (Jenuh Beli)"],
-            "Gaya Trading": ["Scalping / Quick Swing", "Swing Trading", "Hold / Observasi", "Profit Taking"],
-            "Masa Trading": ["1 - 3 Hari", "3 - 10 Hari", "N/A", "Exit Segera"],
-            "Probabilitas": ["Sangat Tinggi", "Tinggi", "Sedang", "Rendah"],
-            "Ideal Waktu Serok": ["Pre-Closing (15:50) / Pembukaan", "Istirahat Siang / Menjelang Penutupan", "N/A", "Hindari Entry"]
-        }
-        df_panduan = pd.DataFrame(data_panduan)
-        st.table(df_panduan)
-        
-        # --- TABEL TAMBAHAN MATRIKS KEPUTUSAN ---
-        st.markdown("### 📋 Matriks Pengambilan Keputusan: Tren vs. Sinyal")
-        matriks_data = {
-            "Tren": ["Up-Trend", "Up-Trend", "Down-Trend", "Sideways"],
-            "Sinyal": ["SUPER BUY", "RISK (Jenuh Beli)", "SUPER BUY", "Neutral"],
-            "Tindakan Utama": ["Aggressive Buy (Accumulate)", "Profit Taking / Hold", "Cicil Beli (Spekulatif & Ketat SL)", "Skip / Wait & See"]
-        }
-        df_matriks = pd.DataFrame(matriks_data)
-        st.table(df_matriks)
-        
-        st.info("""
-        💡 **Panduan Waktu Eksekusi (Serok):**
-        * **Saat Pembukaan (09:00 - 09:15):** Ideal untuk *Scalper* menangkap momentum *gap* harga. Pantau *Unusual Vol*.
-        * **Istirahat Siang (11:30 - 12:00):** Waktu terbaik untuk mengamati apakah akumulasi berlanjut. Jika harga bertahan di atas VWAP, posisi cukup aman untuk di-*hold*.
-        * **Menjelang Penutupan (15:45 - 16:00):** Paling ideal untuk *Swing Trader*. Jika sinyal 'SUPER BUY' muncul di menit-menit akhir, probabilitas kenaikan besok pagi sangat tinggi.
-        """)
-        
-    else:
-        st.warning("⚠️ Tidak ada emiten dari daftar Anda yang lolos kriteria filter saat ini.")
+        else:
+            st.warning("⚠️ Tidak ada emiten dari daftar Anda yang lolos kriteria filter saat ini.")
 else:
     st.info("👋 Silakan pilih atau tambahkan minimal 1 kode emiten pada kolom sidebar untuk memulai radar.")
