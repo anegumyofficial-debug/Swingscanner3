@@ -16,7 +16,6 @@ st.markdown("""
     .main-title { color: #38BDF8; font-weight: 800; padding-bottom: 5px; }
     .sub-text { color: #94A3B8; font-size: 14px; margin-bottom: 20px; }
     .card-dana { background-color: #1E293B; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
-    .card-ihsg { background-color: #1E293B; padding: 20px; border-radius: 12px; border-left: 5px solid #38BDF8; margin-bottom: 25px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -66,7 +65,7 @@ def load_mega_market_tickers():
         "TPIA", "TPMA", "TRAM", "TRIL", "TRIM", "TRIN", "TRIS", "TRJA", "TRJU", "TRST", "TRUE", "TRUK", "TSPC", "TUGU", "TURN", 
         "TYRE", "UCID", "UDNG", "UFOE", "UNGO", "UNIT", "UNTR", "UNVR", "URBN", "UTAA", "VINS", "VIVA", "VIVM", "VKTR", "VOKS", 
         "VONE", "VPAC", "WAPO", "WEGE", "WEHA", "WICO", "WIFI", "WIIM", "WIKA", "WINS", "WIRG", "WITA", "WMUU", "WOOD", "WOWS", 
-        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE", "PTRO", "BRAM"
+        "WSBP", "WSKT", "WTG",  "WTIA", "YPAS", "YUASA", "YULE", "ZATA", "ZBRA", "ZINC", "ZONE", "PTRO"
     ]
     return sorted(list(set([f"{t.strip().upper()}.JK" for t in saham_300_plus])))
 
@@ -92,6 +91,7 @@ def analyze_market_momentum(ticker):
         if df is None or len(df) < 4 or 'Close' not in df.columns: 
             return None
         
+        # Hitung Indikator Technical
         df['EMA9'] = ta.ema(df['Close'], length=9)
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['MA50'] = ta.sma(df['Close'], length=50)
@@ -115,18 +115,23 @@ def analyze_market_momentum(ticker):
         prev_price = float(df['Close'].iloc[-2])
         change_pct = ((last_price - prev_price) / prev_price) * 100
         
+        # --- KALKULASI PERSENTASE ARUS DANA ---
+        # Menggunakan rumus proksi volume & pergerakan harga harian
         if change_pct >= 0:
-            p_masuk = 50 + (min(change_pct * 5, 45))
+            p_masuk = 50 + (min(change_pct * 5, 45))  # Proksi dana masuk dominan saat hijau
         else:
-            p_masuk = max(5, 50 - (abs(change_pct) * 5))
+            p_masuk = max(5, 50 - (abs(change_pct) * 5)) # Proksi dana masuk menciut saat merah
         
+        # Batasi agar rasio tetap masuk akal di rentang 5% s/d 95%
         p_masuk = max(5.0, min(95.0, p_masuk))
         p_keluar = 100.0 - p_masuk
         
+        # --- SIMULASI BANDARMOLOGI (INSTITUTIONAL FLOW & DISCLOSURE) ---
         simulated_net_foreign = (last_volume * last_price * 0.12) / 1_000_000_000
         if change_pct < -1.0:
             simulated_net_foreign = -abs(simulated_net_foreign)
             
+        # Tentukan Status Institutional Flow
         if simulated_net_foreign > 15.0 and change_pct > 1.0:
             inst_flow = "🐋 Big Accum"
         elif simulated_net_foreign > 0 and change_pct > 0:
@@ -136,6 +141,7 @@ def analyze_market_momentum(ticker):
         else:
             inst_flow = "⏳ Neutral"
             
+        # Tentukan Status IDS Disclosure (Notasi/Keterbukaan Khusus)
         if last_volume > (last_vol_ma * 3.0):
             ids_disclosure = "⚠️ Unusual Vol"
         elif abs(change_pct) > 12.0:
@@ -206,68 +212,6 @@ def run_mega_scanner(ticker_list):
 st.markdown("<h1 class='main-title'>📈 Swing Trading & Scalper Radar Dashboard</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-text'>Sistem pemindaian otomatis berskala 300+ Emiten Bursa Efek Indonesia secara Real-Time</p>", unsafe_allow_html=True)
 
-# ----------------- TRACKER MULTI-TIMEFRAME CHART IHSG -----------------
-st.markdown("<div class='card-ihsg'>", unsafe_allow_html=True)
-
-# PERBAIKAN: Memasukkan parameter angka 2 ke st.columns(2) agar tidak memicu TypeError
-tf_col1, tf_col2 = st.columns(2)
-with tf_col2:
-    timeframe_pilihan = st.radio(
-        "Pilih Rentang Waktu Grafik:",
-        options=["Hari (5 Hari)", "Minggu (1 Bulan)", "Bulan (6 Bulan)", "Tahun (1 Tahun)"],
-        horizontal=True
-    )
-
-# Konversi pilihan teks ke parameter Yahoo Finance (period & interval)
-tf_mapping = {
-    "Hari (5 Hari)": {"period": "5d", "interval": "15m", "label": "Batas (5 Hari)"},
-    "Minggu (1 Bulan)": {"period": "1mo", "interval": "1d", "label": "Batas (1 Bulan)"},
-    "Bulan (6 Bulan)": {"period": "6mo", "interval": "1d", "label": "Batas (6 Bulan)"},
-    "Tahun (1 Tahun)": {"period": "1y", "interval": "1d", "label": "Batas (1 Tahun)"}
-}
-
-p_conf = tf_mapping[timeframe_pilihan]
-
-try:
-    # Tarik data multi-timeframe berdasarkan input user
-    ihsg_data = yf.download("^JKSE", period=p_conf["period"], interval=p_conf["interval"], progress=False)
-    ihsg_data = clean_yf_dataframe(ihsg_data)
-    
-    # Tarik data harian pembanding untuk info kartu metrik terupdate saat ini
-    ihsg_live = yf.download("^JKSE", period="5d", interval="1d", progress=False)
-    ihsg_live = clean_yf_dataframe(ihsg_live)
-    
-    if ihsg_data is not None and not ihsg_data.empty:
-        current_ihsg = float(ihsg_live['Close'].iloc[-1])
-        prev_ihsg = float(ihsg_live['Close'].iloc[-2])
-        ihsg_change = ((current_ihsg - prev_ihsg) / prev_ihsg) * 100
-        
-        # Hitung batas tertinggi & terendah sesuai range waktu yang dipilih user
-        ihsg_high = float(ihsg_data['High'].max())
-        ihsg_low = float(ihsg_data['Low'].min())
-        
-        # PERBAIKAN: Mengisi argumen jumlah kolom agar aman
-        col_i1, col_i2, col_i3, col_i4 = st.columns(4)
-        with col_i1:
-            st.metric(label="📌 IHSG Update Saat Ini", value=f"{current_ihsg:,.2f}", delta=f"{ihsg_change:+.2f}%")
-        with col_i2:
-            st.metric(label=f"📈 {p_conf['label']} Max", value=f"{ihsg_high:,.2f}")
-        with col_i3:
-            st.metric(label=f"📉 {p_conf['label']} Min", value=f"{ihsg_low:,.2f}")
-        with col_i4:
-            status_pasar = "🚨 Gawat / Bearish" if ihsg_change < -1.2 else "⏳ Konsolidasi" if abs(ihsg_change) <= 1.2 else "🚀 Bullish Kuat"
-            st.metric(label="⚡ Kondisi Sentimen Harian", value=status_pasar)
-        
-        # Rendering Chart Garis Historis IHSG Sesuai Filter
-        st.markdown(f"**📊 Grafik Pergerakan Histori IHSG Rentang: {timeframe_pilihan}**")
-        chart_df = ihsg_data[['Close']].copy()
-        st.line_chart(chart_df, height=220)
-        
-except Exception as e:
-    st.warning("⚠️ Gagal memuat chart IHSG multi-timeframe, silakan tunggu beberapa saat atau klik refresh.")
-
-st.markdown("</div>", unsafe_allow_html=True)
-
 st.write(f"⏰ Jam Sinkronisasi Terakhir: **{datetime.now().strftime('%H:%M:%S')} WIB**")
 
 if st.button("🔄 Paksa Ambil Data Baru (Clear Cache)"):
@@ -284,7 +228,8 @@ with st.sidebar:
     saham_pilihan = st.multiselect(
         "Kustom Pilih / Ketik Kode Saham Tambahan:",
         options=master_tickers_clean,
-        default=["BBCA", "BBRI", "BBNI", "BBTN", "INDF", "ICBP", "CBDK", "CMRY", "AMRT", "ANTM", "KLBF", "KAEF", "INKP", "ITMG", "UNTR", "GGRM"])
+        default=["CBDK", "CMRY", "DSSA", "AMMN", "ADRO", "BRIS", "GOTO", "ACES", "ARNA", "ASSA"]
+    )
 
 # RENDERING TABEL UTAMA & METRIK PERSENTASE DANA
 if len(saham_pilihan) > 0:
@@ -292,9 +237,12 @@ if len(saham_pilihan) > 0:
         df_radar = run_mega_scanner(saham_pilihan)
     
     if not df_radar.empty:
+        # Menghitung Rata-rata Arus Dana Pasar dari Seluruh Saham yang Dipilih
         avg_masuk = float(df_radar["Dana Masuk %"].mean())
         avg_keluar = 100.0 - avg_masuk
         
+        # TAMPILAN MONITOR RASIO PERSENTASE MASUK & KELUAR DI ATAS TABEL
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(f"""
         <div class='card-dana'>
             <div style='display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px;'>
@@ -313,6 +261,7 @@ if len(saham_pilihan) > 0:
             
         df_radar = df_radar.sort_values(by="Change %", ascending=False)
         
+        # Fungsi styling baris dan warna teks data baru
         def style_radar_rows(row):
             styles = [''] * len(row)
             action = str(row['Actionable'])
@@ -327,6 +276,7 @@ if len(saham_pilihan) > 0:
             idx_masuk = row.index.get_loc('Dana Masuk %')
             idx_keluar = row.index.get_loc('Dana Keluar %')
             
+            # Dana masuk vs keluar color indicator
             styles[idx_masuk] = 'color: #4ADE80; font-weight: bold;'
             styles[idx_keluar] = 'color: #F87171;'
             
