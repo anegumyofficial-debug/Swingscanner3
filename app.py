@@ -174,26 +174,6 @@ def analyze_scalping_momentum(ticker):
         # Catatan Penanda jika data beralih ke mode penutupan harian
         if is_fallback:
             direction += " [Hari Kemarin]"
-
-        # Logika Arah & Momentum
-        if last_price > last_vwap and last_k > last_d and last_k < 50:
-            direction = "🚀 STRONG UP (Siap Buy)"
-            status_sinyal = "BUY"
-        elif last_price > last_vwap and last_k > last_d:
-            direction = "📈 UP MOMENTUM (Koleksi)"
-            status_sinyal = "HOLD"
-        elif last_k < last_d and last_k > 65:
-            direction = "🚨 DUMP RISK"
-            status_sinyal = "SELL"
-        else:
-            direction = "⏳ SIDEWAYS"
-            status_sinyal = "WAIT"
-
-        # Analisis Momentum
-        if last_k > 80: momentum = "🔥 Overbought"
-        elif last_k < 20: momentum = "🧊 Oversold"
-        elif last_k > last_d: momentum = "📈 Bullish"
-        else: momentum = "📉 Bearish"
             
         return {
             "Ticker": ticker_name,
@@ -205,9 +185,7 @@ def analyze_scalping_momentum(ticker):
             "Stoch %D": round(last_d, 2),
             "Est. Arah": direction,
             "Proteksi Stop Loss": stop_loss_est,
-            "Estimasi Take Profit": take_profit_est,
-            "Momentum": momentum,
-            "Status Sinyal": status_sinyal
+            "Estimasi Take Profit": take_profit_est
         }
     except:
         return None
@@ -241,9 +219,7 @@ with st.sidebar:
     only_ready_to_buy = st.checkbox("🎯 Hanya Tampilkan Sinyal SIAP BUY", value=False)
     st.markdown("---")
     saham_pilihan = st.multiselect(
-        
         "Pilih Emiten Pantauan:", 
-        
         options=master_tickers_clean, 
         default=["AADI", "BBCA", "BBRI", "BBNI", "BBTN", "INDF", "ICBP", "CBDK", "CMRY", "AMRT", "ANTM", "KLBF", "KAEF", "INKP", "ITMG", "UNTR","GGRM","SGRO","DSSA","HRTA","IRSX", "WIFI","MDKA","RMKO","RMKE","KLBV","BRMS","BUVA","CPIN","ADRO","BUMI","PTRO","ENRG","JPFA","FILM","MYOR","NCKL","BELI","ULTJ","TMPO"])
 
