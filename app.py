@@ -265,24 +265,7 @@ def analyze_scalping_momentum(ticker):
         total_pressure = est_foreign_buy + est_foreign_sell
         dana_masuk_pct = round((est_foreign_buy / total_pressure) * 100, 1)
         dana_keluar_pct = round((est_foreign_sell / total_pressure) * 100, 1)
-
-
-        # ... (di bawah bagian perhitungan Net Foreign)
-        net_foreign_val = est_foreign_buy - est_foreign_sell
         
-        # Logika Kategori Inst Flow
-        turnover_val = total_turnover_today / 1_000_000_000
-        if net_foreign_val > (turnover_val * 0.2):
-            inst_flow = "Big Accum 🟢"
-        elif net_foreign_val > (turnover_val * 0.05):
-            inst_flow = "Small Accum 🟡"
-        elif net_foreign_val < -(turnover_val * 0.2):
-            inst_flow = "Big Dist 🔴"
-        elif net_foreign_val < -(turnover_val * 0.05):
-            inst_flow = "Small Dist ⚪"
-        else:
-            inst_flow = "Neutral"
-            
         return {
             "Ticker": ticker_name,
             "Live Price": last_price,
@@ -292,7 +275,6 @@ def analyze_scalping_momentum(ticker):
             "Stoch %D": round(last_d, 2),
             "RSI (14)": round(last_rsi, 2),
             "Est. Arah": direction,
-            "Inst Flow": inst_flow,
             "Proteksi Stop Loss": stop_loss_est,
             "Estimasi Take Profit": take_profit_est,   
             "Dana Masuk %": f"{dana_masuk_pct}%",
@@ -341,7 +323,7 @@ with st.sidebar:
         "Pilih Emiten Pantauan:", 
         
         options=master_tickers_clean, 
-        default=["BOLA","FILM","NIRO","WAPO","CARE","CTTH","PANS","BPII","BUMI","BBCA","BBRI","BBNI","BMRI","TLKM","BDMN","IMJS","IRSX","DSSA"])
+        default=["AADI", "BBCA", "BBRI", "BBNI", "BBTN", "INDF", "ICBP", "CBDK", "CMRY", "AMRT", "ANTM", "KLBF", "KAEF", "INKP", "ITMG", "UNTR","GGRM","SGRO","DSSA","HRTA","IRSX", "WIFI","MDKA","RMKO","RMKE","KLBV","BRMS","BUVA","CPIN","ADRO","BUMI","PTRO","ENRG","JPFA","FILM","MYOR","NCKL","BELI","ULTJ","TMPO"])
 
 if len(saham_pilihan) > 0:
     df_scalp = run_scalper_scanner(saham_pilihan)
@@ -370,23 +352,9 @@ if len(saham_pilihan) > 0:
                 styles[idx_sl] = 'color: #F87171; font-weight: bold;'
             return styles
 
-        def style_scalper(row):
-            styles = [''] * len(row)
-            # ... (kode sebelumnya)
-            
-            # Tambahan styling untuk Inst Flow
-            idx_flow = row.index.get_loc('Inst Flow')
-            flow = str(row['Inst Flow'])
-            if "Big Accum" in flow:
-                styles[idx_flow] = 'background-color: #065F46; color: white;'
-            elif "Big Dist" in flow:
-                styles[idx_flow] = 'background-color: #991B1B; color: white;'
-            return styles
-            
         if not df_scalp.empty:
             styled_df = df_scalp.style.apply(style_scalper, axis=1)\
                                       .format({
-                                          "Inst Flow": "{}",
                                           "Live Price": "Rp {:,.0f}",
                                           "Change %": "{:+.2f}%",                          
                                           "VWAP/MA Baseline": "Rp {:,.0f}",
